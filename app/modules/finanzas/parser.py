@@ -7,28 +7,31 @@ from typing import Optional
 class GastoParsed:
     descripcion: str
     cantidad: float
-    categoria: Optional[str] = None
+    categoria_hint: Optional[str] = None  # nombre aproximado, se resuelve en handler
 
 
-# Patrones: "café 2.50", "2.50 café", "café 2,50€"
+# Patrones: "café 2.50", "2.50 café", "café 2,50€", "supermercado mercadona 44"
 PATTERN = re.compile(
-    r'^(?P<desc1>[a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s]+?)\s+(?P<amt1>\d+[.,]\d{1,2})[€$]?$'
-    r'|^(?P<amt2>\d+[.,]\d{1,2})[€$]?\s+(?P<desc2>[a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s]+)$'
-    r'|^(?P<desc3>[a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s]+?)\s+(?P<amt3>\d+)[€$]?$'
+    r'^(?P<desc>[a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s/]+?)\s+(?P<amt>\d+[.,]?\d{0,2})[€$]?$'
+    r'|^(?P<amt2>\d+[.,]?\d{0,2})[€$]?\s+(?P<desc2>[a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s/]+)$'
 )
 
-CATEGORIAS = {
-    "comida": ["café", "cafeteria", "restaurante", "bar", "menu", "almuerzo", "cena", "desayuno", "pizza", "burger"],
-    "transporte": ["gasolina", "gasolinera", "bus", "metro", "taxi", "uber", "parking", "tren"],
-    "supermercado": ["mercadona", "lidl", "carrefour", "aldi", "supermercado", "compra"],
-    "ocio": ["cine", "teatro", "concierto", "netflix", "spotify", "juego"],
-    "salud": ["farmacia", "medico", "dentista", "gym", "gimnasio"],
+# Palabras clave → nombre de categoría (debe coincidir con Categoria.nombre en DB)
+KEYWORDS: dict[str, list[str]] = {
+    "Supermercado": ["mercadona", "lidl", "carrefour", "aldi", "consum", "supermercado", "compra", "family"],
+    "Restaurantes": ["restaurante", "bar", "fanta", "bravas", "buffalo", "terra", "ibérica", "almuerzo", "cena"],
+    "Ocio": ["cine", "teatro", "billar", "ocio"],
+    "Padel / Deporte": ["pádel", "padel", "pcv", "climb", "deporte"],
+    "Gasolina / Transporte": ["gasolina", "gasolinera", "bus", "metro", "taxi", "uber", "parking"],
+    "Suplementos": ["creatina", "proteína", "suplemento"],
+    "Gimnasio": ["gym", "gimnasio"],
+    "Viajes": ["viaje", "vuelo", "hotel", "cumple"],
 }
 
 
 def inferir_categoria(descripcion: str) -> Optional[str]:
     desc_lower = descripcion.lower()
-    for categoria, keywords in CATEGORIAS.items():
+    for categoria, keywords in KEYWORDS.items():
         if any(kw in desc_lower for kw in keywords):
             return categoria
     return None
@@ -40,18 +43,18 @@ def parsear_gasto(texto: str) -> Optional[GastoParsed]:
     if not m:
         return None
 
-    if m.group("desc1"):
-        desc = m.group("desc1").strip()
-        amt = m.group("amt1").replace(",", ".")
-    elif m.group("desc2"):
+    if m.group("desc"):
+        desc = m.group("desc").strip()
+        amt = m.group("amt").replace(",", ".")
+    else:
         desc = m.group("desc2").strip()
         amt = m.group("amt2").replace(",", ".")
-    else:
-        desc = m.group("desc3").strip()
-        amt = m.group("amt3")
+
+    if not amt or amt == ".":
+        return None
 
     return GastoParsed(
         descripcion=desc,
         cantidad=float(amt),
-        categoria=inferir_categoria(desc),
+        categoria_hint=inferir_categoria(desc),
     )

@@ -5,7 +5,10 @@ from app.config import settings
 from app.database import get_session
 from app.services.llm import chat
 from app.modules.finanzas.parser import parsear_gasto
-from app.modules.finanzas.service import registrar_gasto, total_mes, ultimos_gastos, gastos_por_categoria
+from app.modules.finanzas.service import (
+    registrar_gasto, ultimos_gastos, total_mes_global,
+    resumen_mes, buscar_categoria, listar_categorias
+)
 from app.modules.memoria.service import guardar_memoria, listar_memorias, borrar_memoria, construir_contexto
 
 
@@ -19,15 +22,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "SureHub activo.\n\n"
         "*Finanzas*\n"
-        "• Registrar gasto: `café 2.50`\n"
+        "• Registrar gasto: `mercadona 44` o `44 mercadona`\n"
         "• /gastos — últimos gastos\n"
-        "• /mes — total del mes\n"
-        "• /categorias — resumen por categoría\n\n"
+        "• /mes — resumen del mes\n"
+        "• /categorias — lista de categorías\n\n"
         "*Memoria*\n"
-        "• /recuerda <hecho> — guardar algo\n"
-        "• /memoria — ver todo\n"
-        "• /olvidar <id> — borrar un hecho\n\n"
-        "O simplemente habla conmigo.",
+        "• /recuerda <hecho>\n"
+        "• /memoria\n"
+        "• /olvidar <id>\n\n"
+        "O habla conmigo.",
         parse_mode="Markdown"
     )
 
@@ -40,7 +43,11 @@ async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not gastos:
         await update.message.reply_text("Sin gastos registrados.")
         return
-    lineas = [f"• {g.descripcion} — {g.cantidad:.2f}€ ({g.categoria or 'sin categoría'})" for g in gastos]
+    lineas = []
+    for g, cat in gastos:
+        cat_nombre = cat.nombre if cat else "sin categoría"
+        desc = f" — {g.descripcion}" if g.descripcion else ""
+        lineas.append(f"• {cat_nombre}{desc}: {g.cantidad:.2f}€")
     await update.message.reply_text("Últimos gastos:\n" + "\n".join(lineas))
 
 
@@ -48,20 +55,37 @@ async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-    total = total_mes(session)
-    await update.message.reply_text(f"Total este mes: {total:.2f}€")
+    resumen = resumen_mes(session)
+    total = total_mes_global(session)
+
+    if not resumen:
+        await update.message.reply_text("Sin categorías definidas. Usa el dashboard para configurarlas.")
+        return
+
+    lineas = []
+    for r in resumen:
+        if r["total"] == 0 and r["estimacion"] == 0:
+            continue
+        alerta = " ⚠" if r["alerta"] else ""
+        lineas.append(f"• {r['nombre']}: {r['total']:.0f}€ / {r['estimacion']:.0f}€{alerta}")
+
+    lineas.append(f"\nTotal: {total:.2f}€")
+    await update.message.reply_text("Mes actual:\n" + "\n".join(lineas))
 
 
 async def cmd_categorias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-    cats = gastos_por_categoria(session)
+    cats = listar_categorias(session)
     if not cats:
-        await update.message.reply_text("Sin gastos registrados.")
+        await update.message.reply_text("Sin categorías. Configúralas desde el dashboard.")
         return
-    lineas = [f"• {cat}: {total:.2f}€" for cat, total in sorted(cats.items(), key=lambda x: -x[1])]
-    await update.message.reply_text("Por categoría:\n" + "\n".join(lineas))
+    variable = [c for c in cats if c.tipo == "variable"]
+    fijo = [c for c in cats if c.tipo == "fijo"]
+    lineas = ["*Variable*"] + [f"  {c.nombre} — {c.estimacion_mensual:.0f}€/mes" for c in variable]
+    lineas += ["\n*Fijo*"] + [f"  {c.nombre} — {c.estimacion_mensual:.0f}€/mes" for c in fijo]
+    await update.message.reply_text("\n".join(lineas), parse_mode="Markdown")
 
 
 async def cmd_recuerda(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -101,7 +125,7 @@ async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     session = next(get_session())
     ok = borrar_memoria(session, id_)
-    await update.message.reply_text(f"✓ Olvidado." if ok else "No encontrado.")
+    await update.message.reply_text("✓ Olvidado." if ok else "No encontrado.")
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -112,9 +136,10 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     gasto = parsear_gasto(texto)
     if gasto:
         session = next(get_session())
-        registrar_gasto(session, gasto.descripcion, gasto.cantidad, gasto.categoria)
-        cat = f" ({gasto.categoria})" if gasto.categoria else ""
-        await update.message.reply_text(f"✓ {gasto.descripcion} — {gasto.cantidad:.2f}€{cat}")
+        cat = buscar_categoria(session, gasto.categoria_hint) if gasto.categoria_hint else None
+        g = registrar_gasto(session, gasto.cantidad, cat.id if cat else None, gasto.descripcion)
+        cat_nombre = cat.nombre if cat else "sin categoría"
+        await update.message.reply_text(f"✓ {gasto.descripcion} — {gasto.cantidad:.2f}€ ({cat_nombre})")
         return
 
     session = next(get_session())

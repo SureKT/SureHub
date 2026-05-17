@@ -3,10 +3,17 @@ from typing import Optional
 from sqlmodel import SQLModel, Field
 
 
+class Categoria(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nombre: str = Field(unique=True)
+    tipo: str  # "variable" | "fijo"
+    estimacion_mensual: float = 0.0
+
+
 class Gasto(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    descripcion: str
+    categoria_id: Optional[int] = Field(default=None, foreign_key="categoria.id")
     cantidad: float
-    categoria: Optional[str] = None
+    descripcion: Optional[str] = None
     fecha: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     fuente: str = "telegram"  # telegram | csv | manual

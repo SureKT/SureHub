@@ -34,8 +34,10 @@ bot/
 - Sin comentarios obvios — solo si el WHY no es evidente
 
 ## Commits
-- Hacer commit cuando una feature funcione y haya contenido suficiente para justificarlo
-- Si el usuario confirma que algo funciona ("funciona", "listo", "perfecto") y hay cambios staged → proponer o hacer commit directamente
+- Ejecutar commit automáticamente (sin pedir permiso) cuando:
+  - El usuario confirma que algo funciona ("funciona", "listo", "perfecto", "ok")
+  - Y hay cambios suficientes (feature completa, fix real, módulo nuevo)
+- NO commitear por cambios triviales (un typo, un print de debug, ajuste de texto)
 - Mensajes en inglés, formato: `<tipo>: <qué> + detalle en body si aplica`
 - Tipos: `feat`, `fix`, `refactor`, `chore`
 
