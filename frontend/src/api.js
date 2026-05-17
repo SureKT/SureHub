@@ -8,7 +8,11 @@ export const createCategoria = (data) => api.post('/categorias', data).then(r =>
 export const updateCategoria = (id, data) => api.patch(`/categorias/${id}`, data).then(r => r.data)
 export const deleteCategoria = (id) => api.delete(`/categorias/${id}`)
 
-export const getGastos = (params = {}) => api.get('/gastos', { params }).then(r => r.data)
+export const getGastos = (params = {}) => {
+  const p = { ...params }
+  // per_page cap raised on backend to 5000 for exports
+  return api.get('/gastos', { params: p }).then(r => r.data)
+}
 export const createGasto = (data) => api.post('/gastos', data).then(r => r.data)
 export const updateGasto = (id, data) => api.patch(`/gastos/${id}`, data).then(r => r.data)
 export const deleteGasto = (id) => api.delete(`/gastos/${id}`)

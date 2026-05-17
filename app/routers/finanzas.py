@@ -80,14 +80,16 @@ def get_gastos(
     mes: int | None = Query(None),
     categoria_id: int | None = Query(None),
     busqueda: str | None = Query(None),
+    desde: str | None = Query(None),
+    hasta: str | None = Query(None),
     page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=1, le=200),
+    per_page: int = Query(50, ge=1, le=5000),
     orden: str = Query("fecha"),
     asc: bool = Query(False),
     session: Session = Depends(get_session),
 ):
     gastos, total = get_gastos_filtrados(session, anio, mes, categoria_id,
-                                          busqueda, page, per_page, orden, asc)
+                                          busqueda, desde, hasta, page, per_page, orden, asc)
     return {
         "total": total,
         "page": page,

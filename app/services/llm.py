@@ -12,10 +12,12 @@ SYSTEM_BASE = (
 )
 
 
-def chat(mensaje: str, contexto_memoria: str = "") -> str:
+def chat(mensaje: str, contexto_memoria: str = "", contexto_finanzas: str = "") -> str:
     system = SYSTEM_BASE
     if contexto_memoria:
         system += f"\n\n{contexto_memoria}"
+    if contexto_finanzas:
+        system += f"\n\n{contexto_finanzas}"
 
     response = client.messages.create(
         model="claude-sonnet-4-6",

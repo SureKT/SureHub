@@ -41,12 +41,20 @@ def registrar_gasto(session: Session, cantidad: float, categoria_id: int = None,
 
 def get_gastos_filtrados(session: Session, anio: int = None, mes: int = None,
                           categoria_id: int = None, busqueda: str = None,
+                          desde_str: str = None, hasta_str: str = None,
                           page: int = 1, per_page: int = 50,
                           orden: str = "fecha", asc: bool = False
                           ) -> tuple[list[tuple[Gasto, Categoria | None]], int]:
     q = select(Gasto)
 
-    if anio and mes:
+    if desde_str or hasta_str:
+        if desde_str:
+            d = datetime.fromisoformat(desde_str)
+            q = q.where(Gasto.fecha >= d.replace(tzinfo=timezone.utc))
+        if hasta_str:
+            h = datetime.fromisoformat(hasta_str).replace(hour=23, minute=59, second=59)
+            q = q.where(Gasto.fecha <= h.replace(tzinfo=timezone.utc))
+    elif anio and mes:
         desde = datetime(anio, mes, 1, tzinfo=timezone.utc)
         dias = monthrange(anio, mes)[1]
         hasta = datetime(anio, mes, dias, 23, 59, 59, tzinfo=timezone.utc)

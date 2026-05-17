@@ -6,7 +6,15 @@ import Gastos from './components/Gastos'
 import Categorias from './components/Categorias'
 import Memoria from './components/Memoria'
 
-const qc = new QueryClient()
+const qc = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 15000,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 const TABS = [
   { id: 'resumen', label: 'Resumen' },

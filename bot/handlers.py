@@ -13,6 +13,9 @@ from app.modules.finanzas.service import (
 )
 from app.modules.memoria.service import guardar_memoria, listar_memorias, borrar_memoria, construir_contexto
 
+MESES_ES = ["enero","febrero","marzo","abril","mayo","junio",
+            "julio","agosto","septiembre","octubre","noviembre","diciembre"]
+
 
 def allowed(update: Update) -> bool:
     return update.effective_user.id in settings.allowed_user_ids
@@ -23,8 +26,32 @@ def _barra(total: float, estimacion: float) -> str:
         return ""
     pct = min(total / estimacion, 1.0)
     filled = round(pct * 8)
-    bar = "█" * filled + "░" * (8 - filled)
-    return f" `{bar}`"
+    return f" `{'█' * filled}{'░' * (8 - filled)}`"
+
+
+def _construir_contexto_finanzas(session) -> str:
+    ahora = datetime.now(timezone.utc)
+    total = total_mes_global(session)
+    resumen = resumen_mes(session)
+    if not resumen and total == 0:
+        return ""
+    mes_nombre = MESES_ES[ahora.month - 1]
+    lineas = [f"Gastos {mes_nombre} {ahora.year} (datos reales):"]
+    lineas.append(f"- Total: {total:.2f}€")
+    for r in sorted(resumen, key=lambda x: x["total"], reverse=True):
+        if r["total"] > 0:
+            est = f"/{r['estimacion']:.0f}€" if r["estimacion"] > 0 else ""
+            alerta = " [SOBRE PRESUPUESTO]" if r["alerta"] else ""
+            lineas.append(f"- {r['nombre']}: {r['total']:.2f}€{est}{alerta}")
+    return "\n".join(lineas)
+
+
+def _categoria_keyboard(session) -> InlineKeyboardMarkup:
+    cats = listar_categorias(session)[:8]
+    buttons = [InlineKeyboardButton(c.nombre, callback_data=f"cat:{c.id}") for c in cats]
+    rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
+    rows.append([InlineKeyboardButton("Sin categoría", callback_data="cat:0")])
+    return InlineKeyboardMarkup(rows)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,7 +80,6 @@ async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-
     filtrar_mes = context.args and context.args[0].lower() in ("mes", "month")
 
     if filtrar_mes:
@@ -133,6 +159,31 @@ async def callback_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(f"✓ Gasto #{gasto_id} eliminado.")
 
 
+async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    pending = context.user_data.get("pending_gasto")
+    if not pending:
+        await query.edit_message_text("Sin gasto pendiente.")
+        return
+
+    cat_id_str = query.data.split(":")[1]
+    cat_id = int(cat_id_str) if cat_id_str != "0" else None
+
+    session = next(get_session())
+    g = registrar_gasto(session, pending["cantidad"], cat_id, pending["descripcion"])
+
+    cat = session.get(Categoria, cat_id) if cat_id else None
+    cat_nombre = cat.nombre if cat else "sin categoría"
+    context.user_data.pop("pending_gasto", None)
+
+    await query.edit_message_text(
+        f"✓ *{pending['descripcion']}* — {pending['cantidad']:.2f}€ ({cat_nombre})",
+        parse_mode="Markdown"
+    )
+
+
 async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
@@ -158,7 +209,6 @@ async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
             est = f"/{r['estimacion']:.0f}€" if r["estimacion"] > 0 else ""
             lineas.append(f"  {r['nombre']}: {r['total']:.0f}€{est}{alerta}{barra}")
 
-    ahora = datetime.now(timezone.utc)
     lineas.append(f"\n*Total: {total:.2f}€*")
     await update.message.reply_text("\n".join(lineas), parse_mode="Markdown")
 
@@ -219,19 +269,15 @@ async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✓ Olvidado." if ok else "No encontrado.")
 
 
-MESES_ES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
-
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
     ahora = datetime.now(timezone.utc)
-
     total = total_mes_global(session)
     mes_ant = ahora.month - 1 or 12
     anio_ant = ahora.year if ahora.month > 1 else ahora.year - 1
     total_ant = total_mes_global(session, anio_ant, mes_ant)
-
     resumen = resumen_mes(session)
     alertas = [r for r in resumen if r["alerta"]]
     activos = [r for r in resumen if r["total"] > 0]
@@ -243,8 +289,8 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if total_ant > 0:
         pct = ((total - total_ant) / total_ant) * 100
         signo = "+" if pct >= 0 else ""
-        color_txt = "▲" if pct > 5 else ("▼" if pct < -5 else "→")
-        lineas.append(f"Total: *{total:.2f}€*  {color_txt} {signo}{pct:.0f}% vs {MESES_ES[mes_ant-1]}")
+        flecha = "▲" if pct > 5 else ("▼" if pct < -5 else "→")
+        lineas.append(f"Total: *{total:.2f}€*  {flecha} {signo}{pct:.0f}% vs {MESES_ES[mes_ant-1]}")
     else:
         lineas.append(f"Total: *{total:.2f}€*")
 
@@ -270,13 +316,29 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if gasto:
         session = next(get_session())
         cat = buscar_categoria(session, gasto.categoria_hint) if gasto.categoria_hint else None
-        g = registrar_gasto(session, gasto.cantidad, cat.id if cat else None, gasto.descripcion)
-        cat_nombre = cat.nombre if cat else "sin categoría"
-        await update.message.reply_text(f"✓ *{gasto.descripcion}* — {gasto.cantidad:.2f}€ ({cat_nombre})", parse_mode="Markdown")
+
+        if cat:
+            registrar_gasto(session, gasto.cantidad, cat.id, gasto.descripcion)
+            await update.message.reply_text(
+                f"✓ *{gasto.descripcion}* — {gasto.cantidad:.2f}€ ({cat.nombre})",
+                parse_mode="Markdown"
+            )
+        else:
+            # No category matched — ask with inline keyboard
+            context.user_data["pending_gasto"] = {
+                "descripcion": gasto.descripcion,
+                "cantidad": gasto.cantidad,
+            }
+            await update.message.reply_text(
+                f"*{gasto.descripcion}* — {gasto.cantidad:.2f}€\n¿Categoría?",
+                parse_mode="Markdown",
+                reply_markup=_categoria_keyboard(session),
+            )
         return
 
     session = next(get_session())
-    contexto = construir_contexto(session)
+    contexto_memoria = construir_contexto(session)
+    contexto_finanzas = _construir_contexto_finanzas(session)
     await update.message.reply_chat_action("typing")
-    respuesta = await asyncio.to_thread(chat, texto, contexto)
+    respuesta = await asyncio.to_thread(chat, texto, contexto_memoria, contexto_finanzas)
     await update.message.reply_text(respuesta, parse_mode="Markdown")

@@ -153,7 +153,7 @@ export default function Gastos() {
   const toast = useToast()
   const qc = useQueryClient()
 
-  const [filters, setFilters] = useState({ mes: '', categoria_id: '', busqueda: '' })
+  const [filters, setFilters] = useState({ mes: '', categoria_id: '', busqueda: '', desde: '', hasta: '' })
   const [showImportar, setShowImportar] = useState(false)
   const [page, setPage] = useState(1)
   const [orden, setOrden] = useState('fecha')
@@ -167,8 +167,12 @@ export default function Gastos() {
   const { data: meses = [] } = useQuery({ queryKey: ['meses'], queryFn: getMeses })
 
   const mesParams = filters.mes ? { anio: parseInt(filters.mes.split('-')[0]), mes: parseInt(filters.mes.split('-')[1]) } : {}
+  const rangoParams = !filters.mes && (filters.desde || filters.hasta)
+    ? { desde: filters.desde || undefined, hasta: filters.hasta || undefined }
+    : {}
   const queryParams = {
     ...mesParams,
+    ...rangoParams,
     categoria_id: filters.categoria_id || undefined,
     busqueda: filters.busqueda || undefined,
     page,
@@ -189,15 +193,26 @@ export default function Gastos() {
 
   const deleteMut = useMutation({
     mutationFn: deleteGasto,
-    onSuccess: () => {
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ['gastos', queryParams] })
+      const prev = qc.getQueryData(['gastos', queryParams])
+      qc.setQueryData(['gastos', queryParams], old => old
+        ? { ...old, total: old.total - 1, items: old.items.filter(g => g.id !== id) }
+        : old)
+      setConfirmDelete(null)
+      return { prev }
+    },
+    onError: (err, id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['gastos', queryParams], ctx.prev)
+      toast('Error al eliminar', 'error')
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['gastos'] })
       qc.invalidateQueries({ queryKey: ['resumen'] })
       qc.invalidateQueries({ queryKey: ['evolucion'] })
       qc.invalidateQueries({ queryKey: ['meses'] })
-      setConfirmDelete(null)
       toast('Gasto eliminado')
     },
-    onError: () => toast('Error al eliminar', 'error'),
   })
 
   const setFilter = (key, val) => {
@@ -238,9 +253,15 @@ export default function Gastos() {
         </select>
         <input type="text" placeholder="Buscar descripción..." value={filters.busqueda}
           onChange={e => setFilter('busqueda', e.target.value)}
-          style={{ ...inputStyle, fontSize: 13, flex: 1, minWidth: 160 }} />
-        {(filters.mes || filters.categoria_id || filters.busqueda) && (
-          <button onClick={() => { setFilters({ mes: '', categoria_id: '', busqueda: '' }); setPage(1) }}
+          style={{ ...inputStyle, fontSize: 13, flex: 1, minWidth: 130 }} />
+        <input type="date" value={filters.desde}
+          onChange={e => { setFilter('desde', e.target.value); if (e.target.value) setFilter('mes', '') }}
+          style={{ ...inputStyle, fontSize: 12, colorScheme: 'dark' }} title="Desde" />
+        <input type="date" value={filters.hasta}
+          onChange={e => { setFilter('hasta', e.target.value); if (e.target.value) setFilter('mes', '') }}
+          style={{ ...inputStyle, fontSize: 12, colorScheme: 'dark' }} title="Hasta" />
+        {(filters.mes || filters.categoria_id || filters.busqueda || filters.desde || filters.hasta) && (
+          <button onClick={() => { setFilters({ mes: '', categoria_id: '', busqueda: '', desde: '', hasta: '' }); setPage(1) }}
             style={{ ...btnSecStyle, fontSize: 12, padding: '6px 12px' }}>
             Limpiar
           </button>
