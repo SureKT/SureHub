@@ -8,6 +8,7 @@ const FUENTE_STYLE = {
   telegram: { bg: '#1a2a1a', color: '#4caf50', label: 'tg' },
   manual: { bg: '#1e1e2a', color: '#666', label: 'web' },
   importacion: { bg: '#2a1e1a', color: '#f39c12', label: 'imp' },
+  recurrente: { bg: '#1e1a2a', color: '#9b59b6', label: 'rec' },
 }
 
 function FuenteBadge({ fuente }) {

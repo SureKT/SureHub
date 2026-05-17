@@ -5,6 +5,7 @@ import ResumenMes from './components/ResumenMes'
 import Gastos from './components/Gastos'
 import Categorias from './components/Categorias'
 import Memoria from './components/Memoria'
+import Recurrentes from './components/Recurrentes'
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -20,6 +21,7 @@ const TABS = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'gastos', label: 'Gastos' },
   { id: 'categorias', label: 'Categorías' },
+  { id: 'recurrentes', label: 'Recurrentes' },
   { id: 'memoria', label: 'Memoria' },
 ]
 
@@ -60,6 +62,7 @@ function App() {
             {tab === 'resumen' && <ResumenMes />}
             {tab === 'gastos' && <Gastos />}
             {tab === 'categorias' && <Categorias />}
+            {tab === 'recurrentes' && <Recurrentes />}
             {tab === 'memoria' && <Memoria />}
           </main>
         </div>

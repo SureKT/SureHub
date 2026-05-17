@@ -9,7 +9,8 @@ from app.modules.finanzas.models import Gasto, Categoria
 from app.modules.finanzas.parser import parsear_gasto
 from app.modules.finanzas.service import (
     registrar_gasto, ultimos_gastos, total_mes_global,
-    resumen_mes, buscar_categoria, listar_categorias, get_gastos_filtrados
+    resumen_mes, buscar_categoria, listar_categorias, get_gastos_filtrados,
+    generar_recurrentes,
 )
 from app.modules.memoria.service import guardar_memoria, listar_memorias, borrar_memoria, construir_contexto
 
@@ -66,6 +67,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /borrar <id> — eliminar gasto\n"
         "• /mes — resumen del mes\n"
         "• /stats — resumen rápido\n"
+        "• /generar — generar recurrentes del mes\n"
         "• /categorias\n\n"
         "*Memoria*\n"
         "• /recuerda <hecho>\n"
@@ -305,6 +307,23 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lineas.append("Todos los presupuestos OK")
 
     await update.message.reply_text("\n".join(lineas), parse_mode="Markdown")
+
+
+async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    session = next(get_session())
+    ahora = datetime.now(timezone.utc)
+    result = generar_recurrentes(session, ahora.year, ahora.month)
+    total = result["total"]
+    if total == 0:
+        await update.message.reply_text("Todos los recurrentes ya generados este mes.")
+        return
+    lineas = [f"✓ {g['nombre']} — {g['cantidad']:.2f}€" for g in result["generados"]]
+    await update.message.reply_text(
+        f"*{total} gasto{'s' if total > 1 else ''} generado{'s' if total > 1 else ''}:*\n" + "\n".join(lineas),
+        parse_mode="Markdown"
+    )
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):

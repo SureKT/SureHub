@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import create_db
 from app.routers.finanzas import router as finanzas_router
 from app.routers.memoria import router as memoria_router
+from app.routers.recurrentes import router as recurrentes_router
 import app.models  # noqa: F401
 
 
@@ -24,6 +25,7 @@ app.add_middleware(
 
 app.include_router(finanzas_router)
 app.include_router(memoria_router)
+app.include_router(recurrentes_router)
 
 
 @app.get("/health")

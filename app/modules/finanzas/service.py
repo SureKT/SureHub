@@ -1,7 +1,7 @@
 from calendar import monthrange
 from datetime import datetime, timezone
 from sqlmodel import Session, select, func
-from app.modules.finanzas.models import Categoria, Gasto
+from app.modules.finanzas.models import Categoria, Gasto, GastoRecurrente
 
 
 # --- Categorias ---
@@ -191,3 +191,96 @@ def meses_disponibles(session: Session) -> list[dict]:
         .order_by(func.strftime('%Y', Gasto.fecha).desc(), func.strftime('%m', Gasto.fecha).desc())
     ).all()
     return [{"anio": int(a), "mes": int(m), "label": f"{int(m):02d}/{a}"} for a, m in rows]
+
+
+# --- Recurrentes ---
+
+def listar_recurrentes(session: Session, anio: int = None, mes: int = None) -> list[dict]:
+    ahora = datetime.now(timezone.utc)
+    if not anio:
+        anio = ahora.year
+    if not mes:
+        mes = ahora.month
+    desde, hasta = _inicio_fin_mes(anio, mes)
+
+    recurrentes = list(session.exec(
+        select(GastoRecurrente).order_by(GastoRecurrente.dia, GastoRecurrente.nombre)
+    ).all())
+
+    # Single query for all generated gastos this month
+    generados_ids = {
+        g.recurrente_id
+        for g in session.exec(
+            select(Gasto)
+            .where(Gasto.recurrente_id.is_not(None))
+            .where(Gasto.fecha >= desde)
+            .where(Gasto.fecha <= hasta)
+        ).all()
+    }
+
+    result = []
+    for r in recurrentes:
+        cat = session.get(Categoria, r.categoria_id) if r.categoria_id else None
+        result.append({
+            "id": r.id,
+            "nombre": r.nombre,
+            "cantidad": r.cantidad,
+            "categoria_id": r.categoria_id,
+            "categoria_nombre": cat.nombre if cat else None,
+            "dia": r.dia,
+            "activo": r.activo,
+            "generado_este_mes": r.id in generados_ids,
+        })
+    return result
+
+
+def crear_recurrente(session: Session, nombre: str, cantidad: float,
+                     categoria_id: int = None, dia: int = 1) -> GastoRecurrente:
+    r = GastoRecurrente(nombre=nombre, cantidad=cantidad, categoria_id=categoria_id, dia=dia)
+    session.add(r)
+    session.commit()
+    session.refresh(r)
+    return r
+
+
+def generar_recurrentes(session: Session, anio: int = None, mes: int = None) -> dict:
+    ahora = datetime.now(timezone.utc)
+    if not anio:
+        anio = ahora.year
+    if not mes:
+        mes = ahora.month
+    desde, hasta = _inicio_fin_mes(anio, mes)
+
+    recurrentes = list(session.exec(
+        select(GastoRecurrente).where(GastoRecurrente.activo == True)  # noqa: E712
+    ).all())
+
+    generados_ids = {
+        g.recurrente_id
+        for g in session.exec(
+            select(Gasto)
+            .where(Gasto.recurrente_id.is_not(None))
+            .where(Gasto.fecha >= desde)
+            .where(Gasto.fecha <= hasta)
+        ).all()
+    }
+
+    generados, saltados = [], []
+    for r in recurrentes:
+        if r.id in generados_ids:
+            saltados.append(r.nombre)
+            continue
+        dia_real = min(r.dia, monthrange(anio, mes)[1])
+        g = Gasto(
+            cantidad=r.cantidad,
+            categoria_id=r.categoria_id,
+            descripcion=r.nombre,
+            fuente="recurrente",
+            recurrente_id=r.id,
+            fecha=datetime(anio, mes, dia_real, 8, 0, 0, tzinfo=timezone.utc),
+        )
+        session.add(g)
+        generados.append(r.nombre)
+
+    session.commit()
+    return {"generados": generados, "saltados": saltados, "total": len(generados)}
