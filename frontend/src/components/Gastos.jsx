@@ -1,86 +1,290 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getGastos, getCategorias, createGasto } from '../api'
+import { getGastos, getCategorias, createGasto, updateGasto, deleteGasto, getMeses } from '../api'
+import { useToast } from './Toast'
 
-export default function Gastos() {
+const inputStyle = { background: '#1a1a1a', border: '1px solid #333', color: '#eee', padding: '8px 12px', borderRadius: 6, fontSize: 14 }
+const btnStyle = { background: '#3498db', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
+const btnSecStyle = { background: '#2a2a2a', border: '1px solid #444', color: '#ccc', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
+const btnDangerStyle = { background: 'transparent', border: 'none', color: '#555', padding: '4px 8px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }
+
+function AddForm({ categorias, onSuccess }) {
+  const toast = useToast()
   const qc = useQueryClient()
-  const { data: gastos = [], isLoading } = useQuery({ queryKey: ['gastos'], queryFn: () => getGastos(50) })
-  const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: getCategorias })
+  const [form, setForm] = useState({ cantidad: '', descripcion: '', categoria_id: '', fecha: '' })
 
-  const [form, setForm] = useState({ cantidad: '', descripcion: '', categoria_id: '' })
-
-  const mutation = useMutation({
+  const mut = useMutation({
     mutationFn: createGasto,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['gastos'] })
       qc.invalidateQueries({ queryKey: ['resumen'] })
-      setForm({ cantidad: '', descripcion: '', categoria_id: '' })
-    }
+      qc.invalidateQueries({ queryKey: ['evolucion'] })
+      qc.invalidateQueries({ queryKey: ['meses'] })
+      setForm({ cantidad: '', descripcion: '', categoria_id: '', fecha: '' })
+      toast('Gasto añadido')
+      onSuccess?.()
+    },
+    onError: () => toast('Error al añadir gasto', 'error'),
   })
 
   const submit = (e) => {
     e.preventDefault()
     if (!form.cantidad) return
-    mutation.mutate({
+    mut.mutate({
       cantidad: parseFloat(form.cantidad),
       descripcion: form.descripcion || null,
       categoria_id: form.categoria_id ? parseInt(form.categoria_id) : null,
+      fecha: form.fecha || null,
     })
   }
 
   return (
-    <div>
-      <h2 style={{ marginBottom: 20 }}>Gastos</h2>
+    <form onSubmit={submit} style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      <input type="number" step="0.01" placeholder="Cantidad €" value={form.cantidad}
+        onChange={e => setForm(f => ({ ...f, cantidad: e.target.value }))}
+        style={{ ...inputStyle, width: 110 }} required />
+      <input type="text" placeholder="Descripción" value={form.descripcion}
+        onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
+        style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
+      <select value={form.categoria_id} onChange={e => setForm(f => ({ ...f, categoria_id: e.target.value }))} style={inputStyle}>
+        <option value="">Sin categoría</option>
+        {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+      </select>
+      <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
+        style={{ ...inputStyle, colorScheme: 'dark' }} />
+      <button type="submit" disabled={mut.isPending} style={btnStyle}>+ Añadir</button>
+    </form>
+  )
+}
 
-      <form onSubmit={submit} style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-        <input
-          type="number" step="0.01" placeholder="Cantidad €" value={form.cantidad}
-          onChange={e => setForm(f => ({ ...f, cantidad: e.target.value }))}
-          style={inputStyle} required
-        />
-        <input
-          type="text" placeholder="Descripción" value={form.descripcion}
-          onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
-          style={{ ...inputStyle, flex: 2 }}
-        />
-        <select
-          value={form.categoria_id}
-          onChange={e => setForm(f => ({ ...f, categoria_id: e.target.value }))}
-          style={inputStyle}
-        >
+function EditRow({ gasto, categorias, onDone }) {
+  const toast = useToast()
+  const qc = useQueryClient()
+  const [form, setForm] = useState({
+    cantidad: gasto.cantidad,
+    descripcion: gasto.descripcion || '',
+    categoria_id: gasto.categoria?.id || '',
+    fecha: gasto.fecha ? gasto.fecha.slice(0, 10) : '',
+  })
+
+  const mut = useMutation({
+    mutationFn: (data) => updateGasto(gasto.id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['gastos'] })
+      qc.invalidateQueries({ queryKey: ['resumen'] })
+      qc.invalidateQueries({ queryKey: ['evolucion'] })
+      toast('Gasto actualizado')
+      onDone()
+    },
+    onError: () => toast('Error al actualizar', 'error'),
+  })
+
+  const save = () => mut.mutate({
+    cantidad: parseFloat(form.cantidad),
+    descripcion: form.descripcion || null,
+    categoria_id: form.categoria_id ? parseInt(form.categoria_id) : null,
+    fecha: form.fecha || null,
+  })
+
+  return (
+    <tr style={{ background: '#1a1a1a' }}>
+      <td style={{ padding: '6px 8px' }}>
+        <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
+          style={{ ...inputStyle, padding: '4px 8px', fontSize: 13, colorScheme: 'dark', width: 130 }} />
+      </td>
+      <td style={{ padding: '6px 8px' }}>
+        <input type="text" value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
+          style={{ ...inputStyle, padding: '4px 8px', fontSize: 13, width: '100%' }} autoFocus />
+      </td>
+      <td style={{ padding: '6px 8px' }}>
+        <select value={form.categoria_id} onChange={e => setForm(f => ({ ...f, categoria_id: e.target.value }))}
+          style={{ ...inputStyle, padding: '4px 8px', fontSize: 13 }}>
           <option value="">Sin categoría</option>
           {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
-        <button type="submit" style={btnStyle}>+ Añadir</button>
-      </form>
+      </td>
+      <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+        <input type="number" step="0.01" value={form.cantidad} onChange={e => setForm(f => ({ ...f, cantidad: e.target.value }))}
+          style={{ ...inputStyle, padding: '4px 8px', fontSize: 13, width: 80, textAlign: 'right' }} />
+      </td>
+      <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
+        <button onClick={save} disabled={mut.isPending} style={{ ...btnStyle, padding: '4px 10px', fontSize: 13 }}>✓</button>
+        <button onClick={onDone} style={{ ...btnSecStyle, marginLeft: 4, padding: '4px 8px', fontSize: 13 }}>✕</button>
+      </td>
+    </tr>
+  )
+}
+
+export default function Gastos() {
+  const toast = useToast()
+  const qc = useQueryClient()
+
+  const [filters, setFilters] = useState({ mes: '', categoria_id: '', busqueda: '' })
+  const [page, setPage] = useState(1)
+  const [orden, setOrden] = useState('fecha')
+  const [asc, setAsc] = useState(false)
+  const [editId, setEditId] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const PER_PAGE = 30
+
+  const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: getCategorias })
+  const { data: meses = [] } = useQuery({ queryKey: ['meses'], queryFn: getMeses })
+
+  const mesParams = filters.mes ? { anio: parseInt(filters.mes.split('-')[0]), mes: parseInt(filters.mes.split('-')[1]) } : {}
+  const queryParams = {
+    ...mesParams,
+    categoria_id: filters.categoria_id || undefined,
+    busqueda: filters.busqueda || undefined,
+    page,
+    per_page: PER_PAGE,
+    orden,
+    asc,
+  }
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['gastos', queryParams],
+    queryFn: () => getGastos(queryParams),
+    keepPreviousData: true,
+  })
+
+  const gastos = data?.items || []
+  const total = data?.total || 0
+  const totalPages = Math.ceil(total / PER_PAGE)
+
+  const deleteMut = useMutation({
+    mutationFn: deleteGasto,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['gastos'] })
+      qc.invalidateQueries({ queryKey: ['resumen'] })
+      qc.invalidateQueries({ queryKey: ['evolucion'] })
+      qc.invalidateQueries({ queryKey: ['meses'] })
+      setConfirmDelete(null)
+      toast('Gasto eliminado')
+    },
+    onError: () => toast('Error al eliminar', 'error'),
+  })
+
+  const setFilter = (key, val) => {
+    setFilters(f => ({ ...f, [key]: val }))
+    setPage(1)
+  }
+
+  const toggleSort = (col) => {
+    if (orden === col) setAsc(a => !a)
+    else { setOrden(col); setAsc(false) }
+    setPage(1)
+  }
+
+  const SortIcon = ({ col }) => {
+    if (orden !== col) return <span style={{ color: '#444', marginLeft: 4 }}>↕</span>
+    return <span style={{ color: '#3498db', marginLeft: 4 }}>{asc ? '↑' : '↓'}</span>
+  }
+
+  return (
+    <div>
+      <AddForm categorias={categorias} />
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        <select value={filters.mes} onChange={e => setFilter('mes', e.target.value)} style={{ ...inputStyle, fontSize: 13 }}>
+          <option value="">Todos los meses</option>
+          {meses.map(m => <option key={`${m.anio}-${m.mes}`} value={`${m.anio}-${m.mes}`}>{m.label}</option>)}
+        </select>
+        <select value={filters.categoria_id} onChange={e => setFilter('categoria_id', e.target.value)} style={{ ...inputStyle, fontSize: 13 }}>
+          <option value="">Todas las categorías</option>
+          {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <input type="text" placeholder="Buscar descripción..." value={filters.busqueda}
+          onChange={e => setFilter('busqueda', e.target.value)}
+          style={{ ...inputStyle, fontSize: 13, flex: 1, minWidth: 160 }} />
+        {(filters.mes || filters.categoria_id || filters.busqueda) && (
+          <button onClick={() => { setFilters({ mes: '', categoria_id: '', busqueda: '' }); setPage(1) }}
+            style={{ ...btnSecStyle, fontSize: 12, padding: '6px 12px' }}>
+            Limpiar
+          </button>
+        )}
+      </div>
+
+      {/* Count */}
+      <div style={{ color: '#555', fontSize: 12, marginBottom: 8 }}>
+        {total} gasto{total !== 1 ? 's' : ''}
+        {total > 0 && (
+          <span style={{ marginLeft: 8, color: '#444' }}>
+            — total: <span style={{ color: '#aaa' }}>
+              {gastos.reduce((s, g) => s + g.cantidad, 0).toFixed(2)}€
+              {totalPages > 1 && <span style={{ color: '#444' }}> (pág. actual)</span>}
+            </span>
+          </span>
+        )}
+      </div>
 
       {isLoading ? <p style={{ color: '#888' }}>Cargando...</p> : (
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-          <thead>
-            <tr style={{ color: '#888', textAlign: 'left', borderBottom: '1px solid #333' }}>
-              <th style={th}>Fecha</th>
-              <th style={th}>Descripción</th>
-              <th style={th}>Categoría</th>
-              <th style={{ ...th, textAlign: 'right' }}>Cantidad</th>
-            </tr>
-          </thead>
-          <tbody>
-            {gastos.map(g => (
-              <tr key={g.id} style={{ borderBottom: '1px solid #222' }}>
-                <td style={td}>{new Date(g.fecha).toLocaleDateString('es-ES')}</td>
-                <td style={td}>{g.descripcion || '—'}</td>
-                <td style={td}>{g.categoria?.nombre || <span style={{ color: '#555' }}>sin categoría</span>}</td>
-                <td style={{ ...td, textAlign: 'right', fontWeight: 600 }}>{g.cantidad.toFixed(2)}€</td>
+        <>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead>
+              <tr style={{ color: '#666', textAlign: 'left', borderBottom: '1px solid #2a2a2a', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <th style={th} onClick={() => toggleSort('fecha')} role="button">
+                  Fecha<SortIcon col="fecha" />
+                </th>
+                <th style={th} onClick={() => toggleSort('descripcion')} role="button">
+                  Descripción<SortIcon col="descripcion" />
+                </th>
+                <th style={th}>Categoría</th>
+                <th style={{ ...th, textAlign: 'right' }} onClick={() => toggleSort('cantidad')} role="button">
+                  Cantidad<SortIcon col="cantidad" />
+                </th>
+                <th style={{ ...th, width: 80 }} />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {gastos.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: '24px', color: '#555', textAlign: 'center' }}>Sin resultados</td></tr>
+              )}
+              {gastos.map(g => editId === g.id ? (
+                <EditRow key={g.id} gasto={g} categorias={categorias} onDone={() => setEditId(null)} />
+              ) : (
+                <tr key={g.id} style={{ borderBottom: '1px solid #1e1e1e' }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#161616'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <td style={{ ...td, color: '#666', fontSize: 13 }}>{new Date(g.fecha).toLocaleDateString('es-ES')}</td>
+                  <td style={td}>{g.descripcion || <span style={{ color: '#444' }}>—</span>}</td>
+                  <td style={td}>
+                    {g.categoria
+                      ? <span style={{ background: '#1e2a35', color: '#5aafdf', padding: '2px 8px', borderRadius: 10, fontSize: 12 }}>{g.categoria.nombre}</span>
+                      : <span style={{ color: '#444', fontSize: 12 }}>sin categoría</span>}
+                  </td>
+                  <td style={{ ...td, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{g.cantidad.toFixed(2)}€</td>
+                  <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => setEditId(g.id)} style={btnDangerStyle} title="Editar">✎</button>
+                    {confirmDelete === g.id ? (
+                      <>
+                        <button onClick={() => deleteMut.mutate(g.id)} style={{ ...btnDangerStyle, color: '#e74c3c' }} title="Confirmar">✓</button>
+                        <button onClick={() => setConfirmDelete(null)} style={btnDangerStyle} title="Cancelar">✕</button>
+                      </>
+                    ) : (
+                      <button onClick={() => setConfirmDelete(g.id)} style={btnDangerStyle} title="Eliminar">✕</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20 }}>
+              <button onClick={() => setPage(1)} disabled={page === 1} style={btnSecStyle}>«</button>
+              <button onClick={() => setPage(p => p - 1)} disabled={page === 1} style={btnSecStyle}>‹</button>
+              <span style={{ color: '#666', fontSize: 13 }}>{page} / {totalPages}</span>
+              <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages} style={btnSecStyle}>›</button>
+              <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={btnSecStyle}>»</button>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
 }
 
-const inputStyle = { background: '#1a1a1a', border: '1px solid #333', color: '#eee', padding: '8px 12px', borderRadius: 6, fontSize: 14 }
-const btnStyle = { background: '#3498db', border: 'none', color: '#fff', padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 14 }
-const th = { padding: '8px 12px', fontWeight: 500 }
+const th = { padding: '8px 12px', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }
 const td = { padding: '10px 12px', color: '#ddd' }
