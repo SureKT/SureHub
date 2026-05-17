@@ -68,6 +68,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /mes — resumen del mes\n"
         "• /stats — resumen rápido\n"
         "• /generar — generar recurrentes del mes\n"
+        "• /analisis — análisis IA de tus finanzas\n"
         "• /categorias\n\n"
         "*Memoria*\n"
         "• /recuerda <hecho>\n"
@@ -309,6 +310,20 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lineas), parse_mode="Markdown")
 
 
+async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    pregunta = " ".join(context.args).strip() if context.args else ""
+    if not pregunta:
+        pregunta = "Analiza mis gastos de este mes. ¿En qué destaco positiva o negativamente? ¿Algún consejo concreto?"
+    session = next(get_session())
+    contexto_memoria = construir_contexto(session)
+    contexto_finanzas = _construir_contexto_finanzas(session)
+    await update.message.reply_chat_action("typing")
+    respuesta = await asyncio.to_thread(chat, pregunta, contexto_memoria, contexto_finanzas)
+    await update.message.reply_text(respuesta, parse_mode="Markdown")
+
+
 async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
@@ -355,9 +370,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         return
 
-    session = next(get_session())
-    contexto_memoria = construir_contexto(session)
-    contexto_finanzas = _construir_contexto_finanzas(session)
-    await update.message.reply_chat_action("typing")
-    respuesta = await asyncio.to_thread(chat, texto, contexto_memoria, contexto_finanzas)
-    await update.message.reply_text(respuesta, parse_mode="Markdown")
+    await update.message.reply_text(
+        "No entiendo. Escribe un gasto (ej: `mercadona 44`, `cena 32.50`) o usa /help.",
+        parse_mode="Markdown"
+    )
