@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getCategorias, createCategoria, updateCategoria, deleteCategoria, getResumen } from '../api'
 import { useToast } from './Toast'
 
-const inputStyle = { background: '#111', border: '1px solid #333', color: '#eee', padding: '8px 12px', borderRadius: 6, fontSize: 14 }
-const btnStyle = { background: '#3498db', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
-const btnSecStyle = { background: '#2a2a2a', border: '1px solid #444', color: '#ccc', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
-const btnDangerStyle = { background: 'transparent', border: 'none', color: '#555', padding: '6px 8px', cursor: 'pointer', fontSize: 15 }
+const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
+const btnStyle = { background: 'var(--accent)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }
+const btnSecStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }
+const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: '6px 8px', cursor: 'pointer', fontSize: 15 }
 
 export default function Categorias() {
   const toast = useToast()
@@ -77,18 +77,18 @@ export default function Categorias() {
     const alerta = mes?.alerta
     return (
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-        background: c.activa ? '#1a1a1a' : '#141414', borderRadius: 6,
+        display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px',
+        background: 'var(--surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)',
         opacity: c.activa ? 1 : 0.55, flexWrap: 'wrap',
       }}>
-        <span style={{ flex: 1, fontSize: 14, color: alerta ? '#e74c3c' : (c.activa ? '#eee' : '#666'), minWidth: 100 }}>
+        <span style={{ flex: 1, fontSize: 14, color: alerta ? 'var(--red)' : (c.activa ? 'var(--text)' : 'var(--text-dim)'), minWidth: 100 }}>
           {c.nombre}
         </span>
         {mes && c.activa && (
-          <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: alerta ? '#e74c3c' : '#aaa' }}>
+          <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: alerta ? 'var(--red)' : 'var(--text-dim)' }}>
             <span style={{ fontWeight: 600 }}>{mes.total.toFixed(2)}€</span>
             {c.estimacion_mensual > 0 && (
-              <span style={{ color: '#444' }}> / {c.estimacion_mensual.toFixed(0)}€</span>
+              <span style={{ color: 'var(--text-muted)' }}> / {c.estimacion_mensual.toFixed(0)}€</span>
             )}
           </span>
         )}
@@ -105,19 +105,19 @@ export default function Categorias() {
           <>
             <button
               onClick={() => { setEditId(c.id); setEditVal(c.estimacion_mensual) }}
-              style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: '2px 6px', lineHeight: 1 }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', lineHeight: 1 }}
               title="Editar presupuesto"
             >✎</button>
             <button
               onClick={() => updateMut.mutate({ id: c.id, data: { activa: !c.activa } })}
-              style={{ background: 'none', border: 'none', color: c.activa ? '#333' : '#3498db', cursor: 'pointer', fontSize: 11, padding: '2px 6px', letterSpacing: 0.3 }}
+              style={{ background: 'none', border: 'none', color: c.activa ? 'var(--text-muted)' : 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '2px 6px', letterSpacing: 0.3 }}
               title={c.activa ? 'Desactivar' : 'Activar'}
             >
               {c.activa ? '···' : 'activar'}
             </button>
             {confirmDelete === c.id ? (
               <>
-                <button onClick={() => deleteMut.mutate(c.id)} style={{ ...btnDangerStyle, color: '#e74c3c' }}>✓</button>
+                <button onClick={() => deleteMut.mutate(c.id)} style={{ ...btnDangerStyle, color: 'var(--red)' }}>✓</button>
                 <button onClick={() => setConfirmDelete(null)} style={btnDangerStyle}>✕</button>
               </>
             ) : (
@@ -142,13 +142,13 @@ export default function Categorias() {
         <button type="submit" style={btnStyle}>+ Añadir</button>
       </form>
 
-      {isLoading ? <p style={{ color: '#888' }}>Cargando...</p> : (
+      {isLoading ? <p style={{ color: 'var(--text-dim)' }}>Cargando...</p> : (
         <>
           {[['Variable', variable], ['Fijo', fijo]].map(([label, cats]) => (
             <div key={label} style={{ marginBottom: 24 }}>
-              <h3 style={{ color: '#555', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, margin: '0 0 10px' }}>{label}</h3>
+              <h3 style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, margin: '0 0 10px' }}>{label}</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {cats.length === 0 && <p style={{ color: '#444', fontSize: 13 }}>Sin categorías</p>}
+                {cats.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin categorías</p>}
                 {cats.map(c => <CatRow key={c.id} c={c} />)}
               </div>
             </div>
@@ -157,7 +157,7 @@ export default function Categorias() {
           {inactivas.length > 0 && (
             <div style={{ marginTop: 8 }}>
               <button onClick={() => setShowInactivas(s => !s)}
-                style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 13, padding: 0 }}>
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, padding: 0 }}>
                 {showInactivas ? '▾' : '▸'} Inactivas ({inactivas.length})
               </button>
               {showInactivas && (

@@ -7,9 +7,9 @@ const COLORS = ['#3498db','#2ecc71','#e74c3c','#f39c12','#9b59b6','#1abc9c','#e6
 
 function BarraProgreso({ total, estimacion, alerta }) {
   const pct = estimacion > 0 ? Math.min((total / estimacion) * 100, 100) : 0
-  const color = alerta ? '#e74c3c' : pct > 75 ? '#f39c12' : '#3498db'
+  const color = alerta ? 'var(--red)' : pct > 75 ? 'var(--orange)' : 'var(--accent)'
   return (
-    <div style={{ background: '#222', borderRadius: 4, height: 4, width: '100%', marginTop: 5 }}>
+    <div style={{ background: 'var(--surface3)', borderRadius: 4, height: 4, width: '100%', marginTop: 5 }}>
       <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: color, transition: 'width 0.3s' }} />
     </div>
   )
@@ -17,10 +17,10 @@ function BarraProgreso({ total, estimacion, alerta }) {
 
 function KpiCard({ label, value, sub, color }) {
   return (
-    <div style={{ background: '#1a1a1a', borderRadius: 8, padding: '12px 16px', minWidth: 130 }}>
-      <div style={{ color: '#555', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: color || '#fff', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-      {sub && <div style={{ color: '#555', fontSize: 12, marginTop: 3 }}>{sub}</div>}
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)', padding: '12px 16px', minWidth: 130 }}>
+      <div style={{ color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: color || 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      {sub && <div style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 3 }}>{sub}</div>}
     </div>
   )
 }
@@ -37,8 +37,8 @@ export default function ResumenMes() {
   })
   const { data: evol = [] } = useQuery({ queryKey: ['evolucion'], queryFn: () => getEvolucion(12) })
 
-  if (isLoading) return <p style={{ color: '#888' }}>Cargando...</p>
-  if (isError || !data) return <p style={{ color: '#e74c3c' }}>Error al cargar. ¿Está el backend arrancado?</p>
+  if (isLoading) return <p style={{ color: 'var(--text-dim)' }}>Cargando...</p>
+  if (isError || !data) return <p style={{ color: 'var(--red)' }}>Error al cargar. ¿Está el backend arrancado?</p>
 
   const variable = data.categorias.filter(c => c.tipo === 'variable' && (c.total > 0 || c.estimacion > 0))
   const fijo = data.categorias.filter(c => c.tipo === 'fijo' && (c.total > 0 || c.estimacion > 0))
@@ -62,7 +62,7 @@ export default function ResumenMes() {
             const [a, m] = e.target.value.split('-')
             setMesSelec({ anio: parseInt(a), mes: parseInt(m) })
           }}
-          style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', color: '#aaa', padding: '6px 10px', borderRadius: 6, fontSize: 13 }}
+          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
         >
           <option value="">Mes actual</option>
           {meses.map(m => (
@@ -79,7 +79,7 @@ export default function ResumenMes() {
             label="vs anterior"
             value={`${diff >= 0 ? '+' : ''}${diff.toFixed(1)}%`}
             sub={`${totalAnterior?.toFixed(0)}€ prev`}
-            color={diff > 10 ? '#e74c3c' : diff < -5 ? '#2ecc71' : '#aaa'}
+            color={diff > 10 ? 'var(--red)' : diff < -5 ? 'var(--green)' : 'var(--text-dim)'}
           />
         )}
         {topCat && (
@@ -98,18 +98,18 @@ export default function ResumenMes() {
       {/* Categorías */}
       {[['Variable', variable], ['Fijo', fijo]].map(([label, cats]) => cats.length > 0 && (
         <div key={label} style={{ marginBottom: 24 }}>
-          <div style={{ color: '#444', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>{label}</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>{label}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {cats.map(c => (
               <div key={c.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ color: c.alerta ? '#e74c3c' : '#ccc', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: c.alerta ? 'var(--red)' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
                     {c.nombre}
-                    {c.n_gastos > 0 && <span style={{ color: '#444', fontSize: 11 }}>{c.n_gastos}</span>}
+                    {c.n_gastos > 0 && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{c.n_gastos}</span>}
                   </span>
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    <span style={{ color: c.alerta ? '#e74c3c' : '#fff', fontWeight: 600 }}>{c.total.toFixed(2)}€</span>
-                    {c.estimacion > 0 && <span style={{ color: '#3a3a3a' }}> / {c.estimacion.toFixed(0)}€</span>}
+                    <span style={{ color: c.alerta ? 'var(--red)' : 'var(--text)', fontWeight: 600 }}>{c.total.toFixed(2)}€</span>
+                    {c.estimacion > 0 && <span style={{ color: 'var(--text-muted)' }}> / {c.estimacion.toFixed(0)}€</span>}
                   </span>
                 </div>
                 {c.estimacion > 0 && <BarraProgreso total={c.total} estimacion={c.estimacion} alerta={c.alerta} />}
@@ -120,20 +120,20 @@ export default function ResumenMes() {
       ))}
 
       {variable.length === 0 && fijo.length === 0 && (
-        <p style={{ color: '#444', fontSize: 14 }}>Sin gastos este mes.</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Sin gastos este mes.</p>
       )}
 
       {/* Charts */}
       <div className="charts-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, marginTop: 32 }}>
         {evol.length > 1 && (
           <div>
-            <div style={{ color: '#444', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 }}>Evolución 12 meses</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 }}>Evolución 12 meses</div>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={evol} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <XAxis dataKey="label" tick={{ fill: '#444', fontSize: 9 }} />
-                <YAxis tick={{ fill: '#444', fontSize: 9 }} />
-                <Tooltip contentStyle={{ background: '#1a1a1a', border: '1px solid #333', color: '#eee', fontSize: 12 }} formatter={v => `${v.toFixed(2)}€`} />
-                <Bar dataKey="total" fill="#3498db" radius={[2, 2, 0, 0]} />
+                <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 9 }} />
+                <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 9 }} />
+                <Tooltip contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} formatter={v => `${v.toFixed(2)}€`} />
+                <Bar dataKey="total" fill="var(--accent)" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -141,14 +141,14 @@ export default function ResumenMes() {
 
         {pieData.length > 0 && (
           <div>
-            <div style={{ color: '#444', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 }}>Por categoría</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 }}>Por categoría</div>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={65} label={false}>
                   {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
-                <Tooltip contentStyle={{ background: '#1a1a1a', border: '1px solid #333', color: '#eee', fontSize: 12 }} formatter={v => `${v.toFixed(2)}€`} />
-                <Legend wrapperStyle={{ fontSize: 10, color: '#666' }} />
+                <Tooltip contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} formatter={v => `${v.toFixed(2)}€`} />
+                <Legend wrapperStyle={{ fontSize: 10, color: 'var(--text-dim)' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>

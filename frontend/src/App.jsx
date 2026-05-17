@@ -31,41 +31,47 @@ function App() {
   return (
     <QueryClientProvider client={qc}>
       <ToastProvider>
-        <style>{`
-          * { box-sizing: border-box; }
-          body { margin: 0; }
-          .nav-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-          .nav-scroll::-webkit-scrollbar { display: none; }
-          .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-          @media (max-width: 600px) {
-            .main-content { padding: 20px 14px !important; }
-            .nav-brand { display: none; }
-          }
-        `}</style>
-        <div style={{ minHeight: '100vh', background: '#111', color: '#eee', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-          <nav style={{ borderBottom: '1px solid #1e1e1e', padding: '0 16px', display: 'flex', alignItems: 'center' }}>
-            <span className="nav-brand" style={{ fontWeight: 700, marginRight: 16, color: '#3498db', fontSize: 15, whiteSpace: 'nowrap' }}>SureHub</span>
-            <div className="nav-scroll" style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-              {TABS.map(t => (
-                <button key={t.id} onClick={() => setTab(t.id)} style={{
-                  background: 'none', border: 'none', color: tab === t.id ? '#fff' : '#555',
-                  padding: '15px 14px', cursor: 'pointer', fontSize: 14, whiteSpace: 'nowrap',
-                  borderBottom: tab === t.id ? '2px solid #3498db' : '2px solid transparent',
-                  transition: 'color 0.15s',
-                }}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </nav>
-          <main className="main-content" style={{ maxWidth: 920, margin: '0 auto', padding: '28px 20px' }}>
-            {tab === 'resumen' && <ResumenMes />}
-            {tab === 'gastos' && <Gastos />}
-            {tab === 'categorias' && <Categorias />}
-            {tab === 'recurrentes' && <Recurrentes />}
-            {tab === 'memoria' && <Memoria />}
-          </main>
-        </div>
+        <nav style={{
+          borderBottom: '1px solid var(--border)',
+          padding: '0 20px',
+          display: 'flex',
+          alignItems: 'center',
+          background: 'var(--surface)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}>
+          <span className="nav-brand" style={{
+            fontWeight: 700, marginRight: 20, color: 'var(--accent)',
+            fontSize: 15, whiteSpace: 'nowrap', letterSpacing: '-0.3px',
+          }}>SureHub</span>
+          <div className="nav-scroll" style={{ display: 'flex', alignItems: 'center' }}>
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)} style={{
+                background: 'none',
+                border: 'none',
+                color: tab === t.id ? 'var(--text)' : 'var(--text-dim)',
+                padding: '16px 14px',
+                cursor: 'pointer',
+                fontSize: 14,
+                fontWeight: tab === t.id ? 600 : 400,
+                whiteSpace: 'nowrap',
+                borderBottom: tab === t.id ? '2px solid var(--accent)' : '2px solid transparent',
+                transition: 'color 0.15s',
+                transform: 'none',
+              }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+        <main className="main-content" style={{ maxWidth: 940, margin: '0 auto', padding: '28px 24px' }}>
+          {tab === 'resumen' && <ResumenMes />}
+          {tab === 'gastos' && <Gastos />}
+          {tab === 'categorias' && <Categorias />}
+          {tab === 'recurrentes' && <Recurrentes />}
+          {tab === 'memoria' && <Memoria />}
+        </main>
       </ToastProvider>
     </QueryClientProvider>
   )

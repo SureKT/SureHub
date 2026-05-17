@@ -5,10 +5,9 @@ import { useToast } from './Toast'
 import ImportarModal from './ImportarModal'
 
 const FUENTE_STYLE = {
-  telegram: { bg: '#1a2a1a', color: '#4caf50', label: 'tg' },
-  manual: { bg: '#1e1e2a', color: '#666', label: 'web' },
-  importacion: { bg: '#2a1e1a', color: '#f39c12', label: 'imp' },
-  recurrente: { bg: '#1e1a2a', color: '#9b59b6', label: 'rec' },
+  telegram:   { bg: 'var(--green-bg)',  color: 'var(--green)',  label: 'tg' },
+  importacion:{ bg: 'var(--orange-bg)', color: 'var(--orange)', label: 'imp' },
+  recurrente: { bg: 'var(--purple-bg)', color: 'var(--purple)', label: 'rec' },
 }
 
 function FuenteBadge({ fuente }) {
@@ -38,10 +37,10 @@ function exportCSV(gastos, filename = 'gastos.csv') {
   URL.revokeObjectURL(url)
 }
 
-const inputStyle = { background: '#1a1a1a', border: '1px solid #333', color: '#eee', padding: '8px 12px', borderRadius: 6, fontSize: 14 }
-const btnStyle = { background: '#3498db', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
-const btnSecStyle = { background: '#2a2a2a', border: '1px solid #444', color: '#ccc', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
-const btnDangerStyle = { background: 'transparent', border: 'none', color: '#555', padding: '4px 8px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }
+const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
+const btnStyle = { background: 'var(--accent)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }
+const btnSecStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }
+const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: '4px 8px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }
 
 function AddForm({ categorias, onSuccess }) {
   const toast = useToast()
@@ -122,7 +121,7 @@ function EditRow({ gasto, categorias, onDone }) {
   })
 
   return (
-    <tr style={{ background: '#1a1a1a' }}>
+    <tr style={{ background: 'var(--surface2)' }}>
       <td style={{ padding: '6px 8px' }}>
         <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
           style={{ ...inputStyle, padding: '4px 8px', fontSize: 13, colorScheme: 'dark', width: 130 }} />
@@ -228,8 +227,8 @@ export default function Gastos() {
   }
 
   const SortIcon = ({ col }) => {
-    if (orden !== col) return <span style={{ color: '#444', marginLeft: 4 }}>↕</span>
-    return <span style={{ color: '#3498db', marginLeft: 4 }}>{asc ? '↑' : '↓'}</span>
+    if (orden !== col) return <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>↕</span>
+    return <span style={{ color: 'var(--accent)', marginLeft: 4 }}>{asc ? '↑' : '↓'}</span>
   }
 
   return (
@@ -271,7 +270,7 @@ export default function Gastos() {
 
       {/* Count + export */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <div style={{ color: '#555', fontSize: 12 }}>
+        <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>
           {total} gasto{total !== 1 ? 's' : ''}
         </div>
         {total > 0 && (
@@ -291,12 +290,12 @@ export default function Gastos() {
         )}
       </div>
 
-      {isLoading ? <p style={{ color: '#888' }}>Cargando...</p> : (
+      {isLoading ? <p style={{ color: 'var(--text-dim)' }}>Cargando...</p> : (
         <>
           <div className="table-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 540 }}>
             <thead>
-              <tr style={{ color: '#666', textAlign: 'left', borderBottom: '1px solid #2a2a2a', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              <tr style={{ color: 'var(--text-dim)', textAlign: 'left', borderBottom: '1px solid var(--border)', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 <th style={th} onClick={() => toggleSort('fecha')} role="button">
                   Fecha<SortIcon col="fecha" />
                 </th>
@@ -312,27 +311,27 @@ export default function Gastos() {
             </thead>
             <tbody>
               {gastos.length === 0 && (
-                <tr><td colSpan={5} style={{ padding: '24px', color: '#555', textAlign: 'center' }}>Sin resultados</td></tr>
+                <tr><td colSpan={5} style={{ padding: '24px', color: 'var(--text-dim)', textAlign: 'center' }}>Sin resultados</td></tr>
               )}
               {gastos.map(g => editId === g.id ? (
                 <EditRow key={g.id} gasto={g} categorias={categorias} onDone={() => setEditId(null)} />
               ) : (
-                <tr key={g.id} style={{ borderBottom: '1px solid #1e1e1e' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#161616'}
+                <tr key={g.id} style={{ borderBottom: '1px solid var(--border-dim)' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ ...td, color: '#666', fontSize: 13 }}>{new Date(g.fecha).toLocaleDateString('es-ES')}</td>
+                  <td style={{ ...td, color: 'var(--text-dim)', fontSize: 13 }}>{new Date(g.fecha).toLocaleDateString('es-ES')}</td>
                   <td style={td}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {g.descripcion || <span style={{ color: '#444' }}>—</span>}
+                      {g.descripcion || <span style={{ color: 'var(--text-muted)' }}>—</span>}
                       {['telegram', 'importacion', 'recurrente'].includes(g.fuente) && <FuenteBadge fuente={g.fuente} />}
                     </span>
                   </td>
                   <td style={td}>
                     {g.categoria
-                      ? <span style={{ background: '#1e2a35', color: '#5aafdf', padding: '2px 8px', borderRadius: 10, fontSize: 12 }}>{g.categoria.nombre}</span>
-                      : <span style={{ color: '#444', fontSize: 12 }}>sin categoría</span>}
+                      ? <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', padding: '2px 8px', borderRadius: 10, fontSize: 12 }}>{g.categoria.nombre}</span>
+                      : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>sin categoría</span>}
                   </td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{g.cantidad.toFixed(2)}€</td>
+                  <td style={{ ...td, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--text)' }}>{g.cantidad.toFixed(2)}€</td>
                   <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <button onClick={() => setEditId(g.id)} style={btnDangerStyle} title="Editar">✎</button>
                     {confirmDelete === g.id ? (
@@ -367,4 +366,4 @@ export default function Gastos() {
 }
 
 const th = { padding: '8px 12px', fontWeight: 500, cursor: 'pointer', userSelect: 'none' }
-const td = { padding: '10px 12px', color: '#ddd' }
+const td = { padding: '10px 12px', color: 'var(--text)' }

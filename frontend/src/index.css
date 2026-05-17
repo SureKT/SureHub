@@ -1,50 +1,92 @@
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #0d0d13;
+  --surface:    #15151e;
+  --surface2:   #1b1b27;
+  --surface3:   #21212f;
+  --border:     #2a2a3a;
+  --border-dim: #202030;
+  --accent:     #3b82f6;
+  --accent-bg:  rgba(59,130,246,.12);
+  --text:       #e2e2ea;
+  --text-dim:   #6b7280;
+  --text-muted: #38384a;
+  --red:        #ef4444;
+  --red-bg:     rgba(239,68,68,.12);
+  --green:      #22c55e;
+  --green-bg:   rgba(34,197,94,.1);
+  --orange:     #f59e0b;
+  --orange-bg:  rgba(245,158,11,.1);
+  --purple:     #a78bfa;
+  --purple-bg:  rgba(167,139,250,.1);
+  --radius:     10px;
+  --radius-sm:  7px;
 }
 
-html {
-  scroll-behavior: smooth;
-  -webkit-text-size-adjust: 100%;
-}
-
-body {
-  background: #111;
-  color: #eee;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
 }
 
-button, input, select, textarea {
+/* ── Inputs & Selects ── */
+input, select, textarea {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius-sm);
   font-family: inherit;
+  font-size: 14px;
+  padding: 9px 12px;
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
 }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+input::placeholder, textarea::placeholder { color: var(--text-dim); }
+select { cursor: pointer; }
+select option { background: var(--surface2); }
 
-/* Dark scrollbars */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #161616; }
-::-webkit-scrollbar-thumb { background: #2e2e2e; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #444; }
-* { scrollbar-width: thin; scrollbar-color: #2e2e2e #161616; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input[type="date"] { color-scheme: dark; }
 
-/* Remove number spinners */
-input[type='number']::-webkit-inner-spin-button,
-input[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; }
-input[type='number'] { -moz-appearance: textfield; }
+/* ── Buttons ── */
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  transition: opacity .15s, transform .1s, background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active:not(:disabled) { opacity: .75; transform: scale(.96); }
+button:disabled { opacity: .35; cursor: not-allowed; }
 
-/* Focus ring */
-:focus-visible { outline: 2px solid #3498db; outline-offset: 2px; }
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
-/* Table scroll wrapper */
-.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-/* Hide nav scrollbar */
+/* ── Utilities ── */
 .nav-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .nav-scroll::-webkit-scrollbar { display: none; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
 @media (max-width: 600px) {
   .main-content { padding: 16px 12px !important; }
   .nav-brand { display: none !important; }
   .hide-mobile { display: none !important; }
 }
+
+@keyframes slideUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn  { from { opacity:0; } to { opacity:1; } }

@@ -3,10 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getRecurrentes, createRecurrente, updateRecurrente, deleteRecurrente, generarRecurrentes, getCategorias } from '../api'
 import { useToast } from './Toast'
 
-const inputStyle = { background: '#1a1a1a', border: '1px solid #333', color: '#eee', padding: '8px 12px', borderRadius: 6, fontSize: 14 }
-const btnStyle = { background: '#3498db', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
-const btnSecStyle = { background: '#2a2a2a', border: '1px solid #444', color: '#ccc', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
-const btnDangerStyle = { background: 'transparent', border: 'none', color: '#555', padding: '4px 8px', cursor: 'pointer', fontSize: 15 }
+const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
+const btnStyle = { background: 'var(--accent)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }
+const btnSecStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }
+const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: '4px 8px', cursor: 'pointer', fontSize: 15 }
 
 export default function Recurrentes() {
   const toast = useToast()
@@ -91,7 +91,7 @@ export default function Recurrentes() {
 
   return (
     <div>
-      <p style={{ color: '#555', fontSize: 13, margin: '0 0 20px' }}>
+      <p style={{ color: 'var(--text-dim)', fontSize: 13, margin: '0 0 20px' }}>
         Gastos que se generan automáticamente cada mes en la fecha indicada.
       </p>
 
@@ -108,7 +108,7 @@ export default function Recurrentes() {
           {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: '#666', fontSize: 13 }}>Día</span>
+          <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>Día</span>
           <input type="number" min="1" max="28" value={form.dia}
             onChange={e => setForm(f => ({ ...f, dia: e.target.value }))}
             style={{ ...inputStyle, width: 60, textAlign: 'center' }} />
@@ -121,13 +121,13 @@ export default function Recurrentes() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', gap: 20 }}>
             <div>
-              <div style={{ color: '#555', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8 }}>Total mensual</div>
-              <div style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{totalMensual.toFixed(2)}€</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8 }}>Total mensual</div>
+              <div style={{ fontSize: 20, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: 'var(--text)' }}>{totalMensual.toFixed(2)}€</div>
             </div>
             {pendientes.length > 0 && (
               <div>
-                <div style={{ color: '#555', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8 }}>Pendientes</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#f39c12' }}>{pendientes.length}</div>
+                <div style={{ color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.8 }}>Pendientes</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--orange)' }}>{pendientes.length}</div>
               </div>
             )}
           </div>
@@ -136,7 +136,7 @@ export default function Recurrentes() {
             disabled={generarMut.isPending || pendientes.length === 0}
             style={{
               ...btnStyle,
-              background: pendientes.length > 0 ? '#3498db' : '#1e2a35',
+              background: pendientes.length > 0 ? 'var(--accent)' : 'var(--surface2)',
               opacity: pendientes.length === 0 ? 0.5 : 1,
             }}>
             {generarMut.isPending ? 'Generando...' : pendientes.length > 0
@@ -146,12 +146,12 @@ export default function Recurrentes() {
         </div>
       )}
 
-      {isLoading ? <p style={{ color: '#888' }}>Cargando...</p> : (
+      {isLoading ? <p style={{ color: 'var(--text-dim)' }}>Cargando...</p> : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {activos.length === 0 && <p style={{ color: '#444', fontSize: 14 }}>Sin recurrentes. Añade subscripciones, alquiler, etc.</p>}
+            {activos.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Sin recurrentes. Añade subscripciones, alquiler, etc.</p>}
             {activos.map(r => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#1a1a1a', borderRadius: 6, flexWrap: 'wrap' }}>
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'var(--surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)', flexWrap: 'wrap' }}>
                 {editId === r.id ? (
                   <>
                     <input value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))}
@@ -171,18 +171,18 @@ export default function Recurrentes() {
                   <>
                     <span style={{ flex: 1, fontSize: 14, minWidth: 100 }}>{r.nombre}</span>
                     {r.categoria_nombre && (
-                      <span style={{ background: '#1e2a35', color: '#5aafdf', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>
+                      <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>
                         {r.categoria_nombre}
                       </span>
                     )}
-                    <span style={{ color: '#666', fontSize: 12 }}>día {r.dia}</span>
-                    <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: '#fff', minWidth: 70, textAlign: 'right' }}>
+                    <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>día {r.dia}</span>
+                    <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--text)', minWidth: 70, textAlign: 'right' }}>
                       {r.cantidad.toFixed(2)}€
                     </span>
                     <span style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 10, fontWeight: 600,
-                      background: r.generado_este_mes ? '#1a2a1a' : '#2a1e0a',
-                      color: r.generado_este_mes ? '#4caf50' : '#f39c12',
+                      background: r.generado_este_mes ? 'var(--green-bg)' : 'var(--orange-bg)',
+                      color: r.generado_este_mes ? 'var(--green)' : 'var(--orange)',
                     }}>
                       {r.generado_este_mes ? 'generado' : 'pendiente'}
                     </span>
@@ -205,7 +205,7 @@ export default function Recurrentes() {
           </div>
 
           {inactivos.length > 0 && (
-            <div style={{ marginTop: 16, color: '#444', fontSize: 13 }}>
+            <div style={{ marginTop: 16, color: 'var(--text-muted)', fontSize: 13 }}>
               {inactivos.length} inactivo{inactivos.length > 1 ? 's' : ''}
             </div>
           )}
