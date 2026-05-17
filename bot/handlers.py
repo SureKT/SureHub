@@ -6,6 +6,7 @@ from app.database import get_session
 from app.services.llm import chat
 from app.modules.finanzas.parser import parsear_gasto
 from app.modules.finanzas.service import registrar_gasto, total_mes, ultimos_gastos, gastos_por_categoria
+from app.modules.memoria.service import guardar_memoria, listar_memorias, borrar_memoria, construir_contexto
 
 
 def allowed(update: Update) -> bool:
@@ -17,12 +18,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         "SureHub activo.\n\n"
-        "Puedes:\n"
+        "*Finanzas*\n"
         "• Registrar gasto: `café 2.50`\n"
         "• /gastos — últimos gastos\n"
         "• /mes — total del mes\n"
-        "• /categorias — resumen por categoría\n"
-        "• O simplemente hablar conmigo",
+        "• /categorias — resumen por categoría\n\n"
+        "*Memoria*\n"
+        "• /recuerda <hecho> — guardar algo\n"
+        "• /memoria — ver todo\n"
+        "• /olvidar <id> — borrar un hecho\n\n"
+        "O simplemente habla conmigo.",
         parse_mode="Markdown"
     )
 
@@ -59,6 +64,46 @@ async def cmd_categorias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Por categoría:\n" + "\n".join(lineas))
 
 
+async def cmd_recuerda(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    hecho = " ".join(context.args).strip()
+    if not hecho:
+        await update.message.reply_text("Uso: /recuerda <hecho>")
+        return
+    session = next(get_session())
+    m = guardar_memoria(session, hecho)
+    await update.message.reply_text(f"✓ Guardado (id: {m.id}): {hecho}")
+
+
+async def cmd_memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    session = next(get_session())
+    memorias = listar_memorias(session)
+    if not memorias:
+        await update.message.reply_text("Sin memoria guardada.")
+        return
+    lineas = [f"[{m.id}] {m.hecho}" for m in memorias]
+    await update.message.reply_text("Memoria:\n" + "\n".join(lineas))
+
+
+async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    if not context.args:
+        await update.message.reply_text("Uso: /olvidar <id>")
+        return
+    try:
+        id_ = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("ID debe ser un número.")
+        return
+    session = next(get_session())
+    ok = borrar_memoria(session, id_)
+    await update.message.reply_text(f"✓ Olvidado." if ok else "No encontrado.")
+
+
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
@@ -72,6 +117,8 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✓ {gasto.descripcion} — {gasto.cantidad:.2f}€{cat}")
         return
 
+    session = next(get_session())
+    contexto = construir_contexto(session)
     await update.message.reply_chat_action("typing")
-    respuesta = await asyncio.to_thread(chat, texto)
-    await update.message.reply_text(respuesta)
+    respuesta = await asyncio.to_thread(chat, texto, contexto)
+    await update.message.reply_text(respuesta, parse_mode="Markdown")
