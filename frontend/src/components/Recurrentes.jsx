@@ -6,7 +6,7 @@ import { useToast } from './Toast'
 const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
 const btnStyle = { background: 'var(--accent)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }
 const btnSecStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }
-const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: '4px 8px', cursor: 'pointer', fontSize: 15 }
+const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-dim)', padding: '4px 8px', cursor: 'pointer', fontSize: 15 }
 
 export default function Recurrentes() {
   const toast = useToast()
@@ -187,9 +187,8 @@ export default function Recurrentes() {
                       {r.generado_este_mes ? 'generado' : 'pendiente'}
                     </span>
                     <button onClick={() => { setEditId(r.id); setEditForm({ nombre: r.nombre, cantidad: r.cantidad, categoria_id: r.categoria_id, dia: r.dia }) }}
-                      style={{ ...btnSecStyle, fontSize: 12, padding: '4px 10px' }}>
-                      Editar
-                    </button>
+                      style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 15, padding: '4px 8px', lineHeight: 1 }}
+                      title="Editar">✎</button>
                     {confirmDelete === r.id ? (
                       <>
                         <button onClick={() => deleteMut.mutate(r.id)} style={{ ...btnDangerStyle, color: '#e74c3c' }}>✓</button>

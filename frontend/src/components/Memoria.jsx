@@ -102,11 +102,11 @@ export default function Memoria() {
                         <button onClick={() => deleteMut.mutate(m.id)}
                           style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', padding: '0 4px', fontSize: 14 }}>✓</button>
                         <button onClick={() => setConfirmDelete(null)}
-                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '0 4px', fontSize: 14 }}>✕</button>
+                          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '0 4px', fontSize: 14 }}>✗</button>
                       </span>
                     ) : (
                       <button onClick={() => { setConfirmDelete(m.id); setEditId(null) }}
-                        style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0 4px', fontSize: 16, lineHeight: 1 }}>✕</button>
+                        style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', padding: '0 4px', fontSize: 16, lineHeight: 1 }}>✕</button>
                     )}
                   </>
                 )}

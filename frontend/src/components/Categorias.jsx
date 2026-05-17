@@ -6,7 +6,7 @@ import { useToast } from './Toast'
 const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
 const btnStyle = { background: 'var(--accent)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }
 const btnSecStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '6px 12px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }
-const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-muted)', padding: '6px 8px', cursor: 'pointer', fontSize: 15 }
+const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-dim)', padding: '6px 8px', cursor: 'pointer', fontSize: 15 }
 
 export default function Categorias() {
   const toast = useToast()
@@ -105,12 +105,12 @@ export default function Categorias() {
           <>
             <button
               onClick={() => { setEditId(c.id); setEditVal(c.estimacion_mensual) }}
-              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', lineHeight: 1 }}
+              style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', lineHeight: 1 }}
               title="Editar presupuesto"
             >✎</button>
             <button
               onClick={() => updateMut.mutate({ id: c.id, data: { activa: !c.activa } })}
-              style={{ background: 'none', border: 'none', color: c.activa ? 'var(--text-muted)' : 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '2px 6px', letterSpacing: 0.3 }}
+              style={{ background: 'none', border: 'none', color: c.activa ? 'var(--text-dim)' : 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '2px 6px', letterSpacing: 0.3 }}
               title={c.activa ? 'Desactivar' : 'Activar'}
             >
               {c.activa ? '···' : 'activar'}
