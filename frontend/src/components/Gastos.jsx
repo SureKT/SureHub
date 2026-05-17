@@ -146,7 +146,7 @@ export default function Gastos() {
   const { data, isLoading } = useQuery({
     queryKey: ['gastos', queryParams],
     queryFn: () => getGastos(queryParams),
-    keepPreviousData: true,
+    placeholderData: (prev) => prev,
   })
 
   const gastos = data?.items || []
@@ -228,7 +228,8 @@ export default function Gastos() {
 
       {isLoading ? <p style={{ color: '#888' }}>Cargando...</p> : (
         <>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <div className="table-wrap">
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 540 }}>
             <thead>
               <tr style={{ color: '#666', textAlign: 'left', borderBottom: '1px solid #2a2a2a', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 <th style={th} onClick={() => toggleSort('fecha')} role="button">
@@ -277,6 +278,7 @@ export default function Gastos() {
               ))}
             </tbody>
           </table>
+          </div>
 
           {/* Pagination */}
           {totalPages > 1 && (

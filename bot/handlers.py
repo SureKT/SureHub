@@ -34,9 +34,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*Gastos*\n"
         "• Texto libre: `mercadona 44`, `44.50 cena`, `farmacia 12`\n"
         "• /gastos — últimos 10\n"
-        "• /gastos mes — últimos de este mes\n"
+        "• /gastos mes — filtrar mes actual\n"
         "• /borrar <id> — eliminar gasto\n"
         "• /mes — resumen del mes\n"
+        "• /stats — resumen rápido\n"
         "• /categorias\n\n"
         "*Memoria*\n"
         "• /recuerda <hecho>\n"
@@ -217,6 +218,48 @@ async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     session = next(get_session())
     ok = borrar_memoria(session, id_)
     await update.message.reply_text("✓ Olvidado." if ok else "No encontrado.")
+
+
+MESES_ES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    session = next(get_session())
+    ahora = datetime.now(timezone.utc)
+
+    total = total_mes_global(session)
+    mes_ant = ahora.month - 1 or 12
+    anio_ant = ahora.year if ahora.month > 1 else ahora.year - 1
+    total_ant = total_mes_global(session, anio_ant, mes_ant)
+
+    resumen = resumen_mes(session)
+    alertas = [r for r in resumen if r["alerta"]]
+    activos = [r for r in resumen if r["total"] > 0]
+    top = max(activos, key=lambda r: r["total"]) if activos else None
+
+    mes_nombre = MESES_ES[ahora.month - 1].capitalize()
+    lineas = [f"*{mes_nombre} {ahora.year}*"]
+
+    if total_ant > 0:
+        pct = ((total - total_ant) / total_ant) * 100
+        signo = "+" if pct >= 0 else ""
+        color_txt = "▲" if pct > 5 else ("▼" if pct < -5 else "→")
+        lineas.append(f"Total: *{total:.2f}€*  {color_txt} {signo}{pct:.0f}% vs {MESES_ES[mes_ant-1]}")
+    else:
+        lineas.append(f"Total: *{total:.2f}€*")
+
+    if top:
+        pct_top = (top['total'] / total * 100) if total > 0 else 0
+        lineas.append(f"Top: {top['nombre']} — {top['total']:.0f}€ ({pct_top:.0f}%)")
+
+    if alertas:
+        cats = ", ".join(a["nombre"] for a in alertas)
+        lineas.append(f"⚠ Sobre presupuesto: {cats}")
+    else:
+        lineas.append("Todos los presupuestos OK")
+
+    await update.message.reply_text("\n".join(lineas), parse_mode="Markdown")
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):

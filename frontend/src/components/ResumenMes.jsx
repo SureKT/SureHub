@@ -29,7 +29,7 @@ export default function ResumenMes() {
 
   const { data: meses = [] } = useQuery({ queryKey: ['meses'], queryFn: getMeses })
   const params = mesSelec ? { anio: mesSelec.anio, mes: mesSelec.mes } : {}
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['resumen', mesSelec],
     queryFn: () => getResumen(params),
     refetchInterval: mesSelec ? false : 30000,
@@ -37,6 +37,7 @@ export default function ResumenMes() {
   const { data: evol = [] } = useQuery({ queryKey: ['evolucion'], queryFn: () => getEvolucion(12) })
 
   if (isLoading) return <p style={{ color: '#888' }}>Cargando...</p>
+  if (isError || !data) return <p style={{ color: '#e74c3c' }}>Error al cargar datos. ¿Está el backend arrancado?</p>
 
   const variable = data.categorias.filter(c => c.tipo === 'variable' && (c.total > 0 || c.estimacion > 0))
   const fijo = data.categorias.filter(c => c.tipo === 'fijo' && (c.total > 0 || c.estimacion > 0))

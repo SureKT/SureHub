@@ -3,5 +3,8 @@ __pycache__/
 *.pyc
 *.db
 data/
+temp/
 .venv/
 venv/
+frontend/dist/
+frontend/node_modules/
