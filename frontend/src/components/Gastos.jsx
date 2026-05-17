@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getGastos, getCategorias, createGasto, updateGasto, deleteGasto, getMeses } from '../api'
 import { useToast } from './Toast'
+import ImportarModal from './ImportarModal'
 
 const inputStyle = { background: '#1a1a1a', border: '1px solid #333', color: '#eee', padding: '8px 12px', borderRadius: 6, fontSize: 14 }
 const btnStyle = { background: '#3498db', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
@@ -120,6 +121,7 @@ export default function Gastos() {
   const qc = useQueryClient()
 
   const [filters, setFilters] = useState({ mes: '', categoria_id: '', busqueda: '' })
+  const [showImportar, setShowImportar] = useState(false)
   const [page, setPage] = useState(1)
   const [orden, setOrden] = useState('fecha')
   const [asc, setAsc] = useState(false)
@@ -184,8 +186,14 @@ export default function Gastos() {
     <div>
       <AddForm categorias={categorias} />
 
+      {showImportar && <ImportarModal onClose={() => setShowImportar(false)} />}
+
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={() => setShowImportar(true)}
+          style={{ ...btnSecStyle, fontSize: 12, padding: '6px 12px', marginRight: 4 }}>
+          Importar ING
+        </button>
         <select value={filters.mes} onChange={e => setFilter('mes', e.target.value)} style={{ ...inputStyle, fontSize: 13 }}>
           <option value="">Todos los meses</option>
           {meses.map(m => <option key={`${m.anio}-${m.mes}`} value={`${m.anio}-${m.mes}`}>{m.label}</option>)}

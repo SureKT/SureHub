@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel
 from sqlmodel import Session
 from app.database import get_session
@@ -183,3 +183,48 @@ def get_evolucion(meses: int = Query(12, ge=2, le=24), session: Session = Depend
 @router.get("/meses")
 def get_meses(session: Session = Depends(get_session)):
     return meses_disponibles(session)
+
+
+class ImportarRow(BaseModel):
+    fecha: str | None = None
+    descripcion: str | None = None
+    cantidad: float
+    categoria_id: int | None = None
+
+
+@router.post("/importar/preview")
+async def importar_preview(file: UploadFile = File(...), session: Session = Depends(get_session)):
+    from app.modules.finanzas.importer import parse_ing_xls
+    content = await file.read()
+    try:
+        rows = parse_ing_xls(content, session)
+    except Exception as e:
+        raise HTTPException(400, f"Error al procesar archivo: {e}")
+    return rows
+
+
+@router.post("/importar/confirmar", status_code=201)
+def importar_confirmar(rows: list[ImportarRow], session: Session = Depends(get_session)):
+    from app.modules.finanzas.models import Gasto
+    from datetime import datetime, timezone
+    saved = 0
+    for row in rows:
+        fecha = None
+        if row.fecha:
+            try:
+                fecha = datetime.fromisoformat(row.fecha.replace("Z", "+00:00"))
+                if fecha.tzinfo is None:
+                    fecha = fecha.replace(tzinfo=timezone.utc)
+            except ValueError:
+                pass
+        g = Gasto(
+            cantidad=row.cantidad,
+            categoria_id=row.categoria_id,
+            descripcion=row.descripcion,
+            fuente="importacion",
+            **({"fecha": fecha} if fecha else {}),
+        )
+        session.add(g)
+        saved += 1
+    session.commit()
+    return {"importados": saved}
