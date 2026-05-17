@@ -17,7 +17,8 @@ class CategoriaCreate(BaseModel):
 
 
 class CategoriaUpdate(BaseModel):
-    estimacion_mensual: float
+    estimacion_mensual: float | None = None
+    activa: bool | None = None
 
 
 class GastoCreate(BaseModel):
@@ -44,7 +45,10 @@ def patch_categoria(id: int, body: CategoriaUpdate, session: Session = Depends(g
     cat = session.get(Categoria, id)
     if not cat:
         raise HTTPException(404)
-    cat.estimacion_mensual = body.estimacion_mensual
+    if body.estimacion_mensual is not None:
+        cat.estimacion_mensual = body.estimacion_mensual
+    if body.activa is not None:
+        cat.activa = body.activa
     session.add(cat)
     session.commit()
     session.refresh(cat)

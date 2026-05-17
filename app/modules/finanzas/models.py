@@ -8,6 +8,7 @@ class Categoria(SQLModel, table=True):
     nombre: str = Field(unique=True)
     tipo: str  # "variable" | "fijo"
     estimacion_mensual: float = 0.0
+    activa: bool = Field(default=True)
 
 
 class Gasto(SQLModel, table=True):

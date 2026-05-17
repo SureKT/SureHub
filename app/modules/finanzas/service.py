@@ -14,8 +14,11 @@ def crear_categoria(session: Session, nombre: str, tipo: str, estimacion: float 
     return cat
 
 
-def listar_categorias(session: Session) -> list[Categoria]:
-    return list(session.exec(select(Categoria).order_by(Categoria.tipo, Categoria.nombre)).all())
+def listar_categorias(session: Session, solo_activas: bool = True) -> list[Categoria]:
+    q = select(Categoria)
+    if solo_activas:
+        q = q.where(Categoria.activa == True)  # noqa: E712
+    return list(session.exec(q.order_by(Categoria.tipo, Categoria.nombre)).all())
 
 
 def buscar_categoria(session: Session, nombre: str) -> Categoria | None:
