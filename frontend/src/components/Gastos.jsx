@@ -206,12 +206,12 @@ export default function Gastos() {
       if (ctx?.prev) qc.setQueryData(['gastos', queryParams], ctx.prev)
       toast('Error al eliminar', 'error')
     },
+    onSuccess: () => toast('Gasto eliminado'),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ['gastos'] })
       qc.invalidateQueries({ queryKey: ['resumen'] })
       qc.invalidateQueries({ queryKey: ['evolucion'] })
       qc.invalidateQueries({ queryKey: ['meses'] })
-      toast('Gasto eliminado')
     },
   })
 
