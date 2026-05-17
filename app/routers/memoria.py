@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session
 from app.database import get_session
-from app.modules.memoria.service import guardar_memoria, listar_memorias, borrar_memoria
+from app.modules.memoria.service import guardar_memoria, listar_memorias, borrar_memoria, actualizar_memoria
 
 router = APIRouter(prefix="/api/memoria", tags=["memoria"])
 
@@ -19,6 +19,14 @@ def get_memorias(session: Session = Depends(get_session)):
 @router.post("", status_code=201)
 def post_memoria(body: MemoriaCreate, session: Session = Depends(get_session)):
     return guardar_memoria(session, body.hecho)
+
+
+@router.patch("/{id}")
+def patch_memoria(id: int, body: MemoriaCreate, session: Session = Depends(get_session)):
+    m = actualizar_memoria(session, id, body.hecho)
+    if not m:
+        raise HTTPException(404)
+    return m
 
 
 @router.delete("/{id}", status_code=204)

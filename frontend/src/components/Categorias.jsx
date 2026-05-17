@@ -95,24 +95,25 @@ export default function Categorias() {
         {editId === c.id ? (
           <>
             <input type="number" step="0.01" value={editVal} onChange={e => setEditVal(e.target.value)}
-              style={{ ...inputStyle, width: 100 }} autoFocus
+              style={{ ...inputStyle, width: 90, fontSize: 13, padding: '4px 8px' }} autoFocus
               onKeyDown={e => { if (e.key === 'Enter') updateMut.mutate({ id: c.id, data: { estimacion_mensual: parseFloat(editVal) } }) }}
             />
-            <button onClick={() => updateMut.mutate({ id: c.id, data: { estimacion_mensual: parseFloat(editVal) } })} style={btnStyle}>✓</button>
-            <button onClick={() => setEditId(null)} style={btnSecStyle}>✕</button>
+            <button onClick={() => updateMut.mutate({ id: c.id, data: { estimacion_mensual: parseFloat(editVal) } })} style={{ ...btnStyle, padding: '4px 10px', fontSize: 13 }}>✓</button>
+            <button onClick={() => setEditId(null)} style={{ ...btnSecStyle, padding: '4px 8px', fontSize: 13 }}>✕</button>
           </>
         ) : (
           <>
-            {!mes && <span style={{ color: '#444', fontSize: 13 }}>{c.estimacion_mensual > 0 ? `${c.estimacion_mensual.toFixed(0)}€/mes` : '—'}</span>}
-            <button onClick={() => { setEditId(c.id); setEditVal(c.estimacion_mensual) }}
-              style={{ ...btnSecStyle, fontSize: 12, padding: '4px 10px' }} title="Editar presupuesto">
-              Presupuesto
-            </button>
+            <button
+              onClick={() => { setEditId(c.id); setEditVal(c.estimacion_mensual) }}
+              style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', fontSize: 14, padding: '2px 6px', lineHeight: 1 }}
+              title="Editar presupuesto"
+            >✎</button>
             <button
               onClick={() => updateMut.mutate({ id: c.id, data: { activa: !c.activa } })}
-              style={{ ...btnSecStyle, color: c.activa ? '#666' : '#3498db', fontSize: 12, padding: '4px 10px' }}
+              style={{ background: 'none', border: 'none', color: c.activa ? '#3a3a3a' : '#3498db', cursor: 'pointer', fontSize: 11, padding: '2px 6px' }}
+              title={c.activa ? 'Desactivar' : 'Activar'}
             >
-              {c.activa ? 'Desactivar' : 'Activar'}
+              {c.activa ? 'off' : 'on'}
             </button>
             {confirmDelete === c.id ? (
               <>

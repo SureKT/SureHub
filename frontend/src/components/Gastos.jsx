@@ -273,14 +273,6 @@ export default function Gastos() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ color: '#555', fontSize: 12 }}>
           {total} gasto{total !== 1 ? 's' : ''}
-          {total > 0 && (
-            <span style={{ marginLeft: 8, color: '#444' }}>
-              — total: <span style={{ color: '#aaa' }}>
-                {gastos.reduce((s, g) => s + g.cantidad, 0).toFixed(2)}€
-                {totalPages > 1 && <span style={{ color: '#444' }}> (pág. actual)</span>}
-              </span>
-            </span>
-          )}
         </div>
         {total > 0 && (
           <button
@@ -332,7 +324,7 @@ export default function Gastos() {
                   <td style={td}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {g.descripcion || <span style={{ color: '#444' }}>—</span>}
-                      {g.fuente !== 'manual' && <FuenteBadge fuente={g.fuente} />}
+                      {g.fuente && g.fuente !== 'manual' && <FuenteBadge fuente={g.fuente} />}
                     </span>
                   </td>
                   <td style={td}>

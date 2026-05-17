@@ -30,6 +30,7 @@ export const importarConfirmar = (rows) => api.post('/importar/confirmar', rows)
 
 export const getMemorias = () => memApi.get('').then(r => r.data)
 export const createMemoria = (hecho) => memApi.post('', { hecho }).then(r => r.data)
+export const updateMemoria = (id, hecho) => memApi.patch(`/${id}`, { hecho }).then(r => r.data)
 export const deleteMemoria = (id) => memApi.delete(`/${id}`)
 
 const recApi = axios.create({ baseURL: '/api/finanzas/recurrentes' })

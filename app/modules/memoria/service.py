@@ -14,6 +14,17 @@ def listar_memorias(session: Session) -> list[Memoria]:
     return list(session.exec(select(Memoria).order_by(Memoria.fecha)).all())
 
 
+def actualizar_memoria(session: Session, id: int, hecho: str):
+    memoria = session.get(Memoria, id)
+    if not memoria:
+        return None
+    memoria.hecho = hecho
+    session.add(memoria)
+    session.commit()
+    session.refresh(memoria)
+    return memoria
+
+
 def borrar_memoria(session: Session, id: int) -> bool:
     memoria = session.get(Memoria, id)
     if not memoria:
