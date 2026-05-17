@@ -113,7 +113,10 @@ export default function ResumenMes() {
             {cats.map(c => (
               <div key={c.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 14 }}>
-                  <span style={{ color: c.alerta ? '#e74c3c' : '#ddd' }}>{c.nombre}</span>
+                  <span style={{ color: c.alerta ? '#e74c3c' : '#ddd' }}>
+                    {c.nombre}
+                    {c.n_gastos > 0 && <span style={{ color: '#3a3a3a', fontSize: 11, marginLeft: 6 }}>{c.n_gastos}</span>}
+                  </span>
                   <span style={{ color: '#aaa', fontSize: 13 }}>
                     <span style={{ color: c.alerta ? '#e74c3c' : '#fff', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{c.total.toFixed(2)}€</span>
                     {c.estimacion > 0 && <span style={{ color: '#444' }}> / {c.estimacion.toFixed(0)}€</span>}

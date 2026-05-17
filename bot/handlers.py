@@ -5,6 +5,7 @@ from telegram.ext import ContextTypes
 from app.config import settings
 from app.database import get_session
 from app.services.llm import chat
+from app.modules.finanzas.models import Gasto, Categoria
 from app.modules.finanzas.parser import parsear_gasto
 from app.modules.finanzas.service import (
     registrar_gasto, ultimos_gastos, total_mes_global,
@@ -93,13 +94,12 @@ async def cmd_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     session = next(get_session())
-    from app.modules.finanzas.models import Gasto
     gasto = session.get(Gasto, gasto_id)
     if not gasto:
         await update.message.reply_text(f"No existe el gasto #{gasto_id}.")
         return
 
-    cat = session.get(__import__('app.modules.finanzas.models', fromlist=['Categoria']).Categoria, gasto.categoria_id) if gasto.categoria_id else None
+    cat = session.get(Categoria, gasto.categoria_id) if gasto.categoria_id else None
     cat_nombre = cat.nombre if cat else "sin categoría"
     desc = f" — {gasto.descripcion}" if gasto.descripcion else ""
 
@@ -124,7 +124,6 @@ async def callback_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     gasto_id = int(query.data.split(":")[1])
     session = next(get_session())
-    from app.modules.finanzas.models import Gasto
     gasto = session.get(Gasto, gasto_id)
     if not gasto:
         await query.edit_message_text("No encontrado.")

@@ -118,11 +118,21 @@ def resumen_mes(session: Session, anio: int = None, mes: int = None) -> list[dic
     dias_mes = monthrange(anio, mes)[1]
     es_mes_actual = (anio == ahora.year and mes == ahora.month)
     fraccion = (ahora.day / dias_mes) if es_mes_actual else 1.0
+    desde, hasta = _inicio_fin_mes(anio, mes)
+
+    # Single query: sum + count grouped by category
+    rows = session.exec(
+        select(Gasto.categoria_id, func.sum(Gasto.cantidad), func.count(Gasto.id))
+        .where(Gasto.fecha >= desde)
+        .where(Gasto.fecha <= hasta)
+        .group_by(Gasto.categoria_id)
+    ).all()
+    totals = {cat_id: (float(total or 0), int(count or 0)) for cat_id, total, count in rows}
 
     categorias = listar_categorias(session)
     resultado = []
     for cat in categorias:
-        total = total_mes_categoria(session, cat.id, anio, mes)
+        total, n_gastos = totals.get(cat.id, (0.0, 0))
         prediccion = round(cat.estimacion_mensual * fraccion, 2)
         alerta = total > cat.estimacion_mensual and cat.estimacion_mensual > 0
         resultado.append({
@@ -132,6 +142,7 @@ def resumen_mes(session: Session, anio: int = None, mes: int = None) -> list[dic
             "estimacion": cat.estimacion_mensual,
             "prediccion": prediccion,
             "total": total,
+            "n_gastos": n_gastos,
             "alerta": alerta,
         })
     return resultado

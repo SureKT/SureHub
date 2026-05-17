@@ -4,6 +4,39 @@ import { getGastos, getCategorias, createGasto, updateGasto, deleteGasto, getMes
 import { useToast } from './Toast'
 import ImportarModal from './ImportarModal'
 
+const FUENTE_STYLE = {
+  telegram: { bg: '#1a2a1a', color: '#4caf50', label: 'tg' },
+  manual: { bg: '#1e1e2a', color: '#666', label: 'web' },
+  importacion: { bg: '#2a1e1a', color: '#f39c12', label: 'imp' },
+}
+
+function FuenteBadge({ fuente }) {
+  const s = FUENTE_STYLE[fuente] || FUENTE_STYLE.manual
+  return (
+    <span style={{ background: s.bg, color: s.color, padding: '1px 5px', borderRadius: 4, fontSize: 10, fontWeight: 600, letterSpacing: 0.3 }}>
+      {s.label}
+    </span>
+  )
+}
+
+function exportCSV(gastos, filename = 'gastos.csv') {
+  const cols = ['id', 'fecha', 'descripcion', 'categoria', 'cantidad', 'fuente']
+  const rows = gastos.map(g => [
+    g.id,
+    new Date(g.fecha).toLocaleDateString('es-ES'),
+    (g.descripcion || '').replace(/"/g, '""'),
+    (g.categoria?.nombre || '').replace(/"/g, '""'),
+    g.cantidad.toFixed(2),
+    g.fuente,
+  ])
+  const csv = [cols, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
 const inputStyle = { background: '#1a1a1a', border: '1px solid #333', color: '#eee', padding: '8px 12px', borderRadius: 6, fontSize: 14 }
 const btnStyle = { background: '#3498db', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
 const btnSecStyle = { background: '#2a2a2a', border: '1px solid #444', color: '#ccc', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }
@@ -127,6 +160,7 @@ export default function Gastos() {
   const [asc, setAsc] = useState(false)
   const [editId, setEditId] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [exporting, setExporting] = useState(false)
   const PER_PAGE = 30
 
   const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: getCategorias })
@@ -213,16 +247,33 @@ export default function Gastos() {
         )}
       </div>
 
-      {/* Count */}
-      <div style={{ color: '#555', fontSize: 12, marginBottom: 8 }}>
-        {total} gasto{total !== 1 ? 's' : ''}
-        {total > 0 && (
-          <span style={{ marginLeft: 8, color: '#444' }}>
-            — total: <span style={{ color: '#aaa' }}>
-              {gastos.reduce((s, g) => s + g.cantidad, 0).toFixed(2)}€
-              {totalPages > 1 && <span style={{ color: '#444' }}> (pág. actual)</span>}
+      {/* Count + export */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <div style={{ color: '#555', fontSize: 12 }}>
+          {total} gasto{total !== 1 ? 's' : ''}
+          {total > 0 && (
+            <span style={{ marginLeft: 8, color: '#444' }}>
+              — total: <span style={{ color: '#aaa' }}>
+                {gastos.reduce((s, g) => s + g.cantidad, 0).toFixed(2)}€
+                {totalPages > 1 && <span style={{ color: '#444' }}> (pág. actual)</span>}
+              </span>
             </span>
-          </span>
+          )}
+        </div>
+        {total > 0 && (
+          <button
+            disabled={exporting}
+            onClick={async () => {
+              setExporting(true)
+              try {
+                const all = await getGastos({ ...queryParams, page: 1, per_page: 5000 })
+                const mes = filters.mes || 'todos'
+                exportCSV(all.items, `gastos-${mes}.csv`)
+              } finally { setExporting(false) }
+            }}
+            style={{ ...btnSecStyle, fontSize: 11, padding: '4px 10px' }}>
+            {exporting ? '...' : 'Exportar CSV'}
+          </button>
         )}
       </div>
 
@@ -256,7 +307,12 @@ export default function Gastos() {
                   onMouseEnter={e => e.currentTarget.style.background = '#161616'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ ...td, color: '#666', fontSize: 13 }}>{new Date(g.fecha).toLocaleDateString('es-ES')}</td>
-                  <td style={td}>{g.descripcion || <span style={{ color: '#444' }}>—</span>}</td>
+                  <td style={td}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {g.descripcion || <span style={{ color: '#444' }}>—</span>}
+                      {g.fuente !== 'manual' && <FuenteBadge fuente={g.fuente} />}
+                    </span>
+                  </td>
                   <td style={td}>
                     {g.categoria
                       ? <span style={{ background: '#1e2a35', color: '#5aafdf', padding: '2px 8px', borderRadius: 10, fontSize: 12 }}>{g.categoria.nombre}</span>
