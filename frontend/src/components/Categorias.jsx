@@ -110,10 +110,10 @@ export default function Categorias() {
             >✎</button>
             <button
               onClick={() => updateMut.mutate({ id: c.id, data: { activa: !c.activa } })}
-              style={{ background: 'none', border: 'none', color: c.activa ? '#3a3a3a' : '#3498db', cursor: 'pointer', fontSize: 11, padding: '2px 6px' }}
+              style={{ background: 'none', border: 'none', color: c.activa ? '#333' : '#3498db', cursor: 'pointer', fontSize: 11, padding: '2px 6px', letterSpacing: 0.3 }}
               title={c.activa ? 'Desactivar' : 'Activar'}
             >
-              {c.activa ? 'off' : 'on'}
+              {c.activa ? '···' : 'activar'}
             </button>
             {confirmDelete === c.id ? (
               <>

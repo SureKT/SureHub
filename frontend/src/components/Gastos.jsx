@@ -324,7 +324,7 @@ export default function Gastos() {
                   <td style={td}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {g.descripcion || <span style={{ color: '#444' }}>—</span>}
-                      {g.fuente && g.fuente !== 'manual' && <FuenteBadge fuente={g.fuente} />}
+                      {['telegram', 'importacion', 'recurrente'].includes(g.fuente) && <FuenteBadge fuente={g.fuente} />}
                     </span>
                   </td>
                   <td style={td}>
