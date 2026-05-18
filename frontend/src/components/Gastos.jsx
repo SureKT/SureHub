@@ -38,7 +38,7 @@ function exportCSV(gastos, filename = 'gastos.csv') {
 }
 
 const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
-const btnStyle = { background: 'var(--accent)', border: 'none', color: '#fff', padding: '8px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }
+const btnStyle = { background: 'var(--accent)', border: 'none', color: 'var(--bg)', padding: '8px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }
 const btnSecStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }
 const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-dim)', padding: '4px 8px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }
 
@@ -142,7 +142,7 @@ function EditRow({ gasto, categorias, onDone }) {
           style={{ ...inputStyle, padding: '4px 8px', fontSize: 13, width: 80, textAlign: 'right' }} />
       </td>
       <td style={{ padding: '6px 8px', whiteSpace: 'nowrap' }}>
-        <button onClick={save} disabled={mut.isPending} style={{ ...btnStyle, padding: '4px 10px', fontSize: 13 }}>✓</button>
+        <button onClick={save} disabled={mut.isPending} style={{ ...btnStyle, padding: '4px 10px', fontSize: 13, color: 'var(--bg)' }}>✓</button>
         <button onClick={onDone} style={{ ...btnSecStyle, marginLeft: 4, padding: '4px 8px', fontSize: 13 }}>✕</button>
       </td>
     </tr>

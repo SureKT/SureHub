@@ -57,7 +57,7 @@ export default function Memoria() {
           style={{ ...inputStyle, flex: 1 }}
         />
         <button type="submit" disabled={createMut.isPending || !texto.trim()}
-          style={{ background: 'var(--accent)', border: 'none', color: '#fff', padding: '10px 18px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          style={{ background: 'var(--accent)', border: 'none', color: 'var(--bg)', padding: '10px 18px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
           + Guardar
         </button>
       </form>
@@ -82,7 +82,7 @@ export default function Memoria() {
                     />
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <button onClick={saveEdit} disabled={updateMut.isPending}
-                        style={{ background: 'var(--accent)', border: 'none', color: '#fff', padding: '4px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }}>✓</button>
+                        style={{ background: 'var(--accent)', border: 'none', color: 'var(--bg)', padding: '4px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }}>✓</button>
                       <button onClick={() => setEditId(null)}
                         style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '4px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }}>✕</button>
                     </div>

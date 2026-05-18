@@ -10,12 +10,12 @@ export const input = {
 export const btnPrimary = {
   background: 'var(--accent)',
   border: 'none',
-  color: '#fff',
+  color: 'var(--bg)',
   padding: '9px 16px',
   borderRadius: 'var(--radius-sm)',
   cursor: 'pointer',
   fontSize: 14,
-  fontWeight: 600,
+  fontWeight: 500,
 }
 
 export const btnSecondary = {
