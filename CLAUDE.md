@@ -87,9 +87,10 @@ El frontend usa la skill `ui-ecosystem`. Antes de cualquier cambio visual, aplic
 
 **Nunca implementar cambios visuales sin seguir este flujo:**
 
-1. **Proponer antes de codificar** — escribir en texto qué elemento se va a cambiar, por qué viola el design system, y qué solución se va a aplicar. Esperar confirmación.
-2. **Un componente a la vez** — no refactorizar múltiples vistas en un solo paso.
-3. **Autoevaluar al terminar** — ejecutar el checklist del SKILL.md y reportar resultado.
+1. **Audit visual primero** — antes de proponer nada, tomar screenshots de la vista con Playwright e identificar qué la hace parecer inacabada: no solo violaciones de tokens sino criterio de acabado (elemento focal, jerarquía, estados vacíos, peso relativo de controles). Si el cambio afecta múltiples vistas, hacer el audit de todas antes de tocar código.
+2. **Proponer antes de codificar** — escribir en texto qué elemento se va a cambiar, por qué viola el design system o los criterios de acabado, y qué solución se va a aplicar. Incluir boceto ASCII si el cambio es estructural. Esperar confirmación.
+3. **Un componente a la vez** — no refactorizar múltiples vistas en un solo paso.
+4. **Autoevaluar al terminar** — tomar screenshot con Playwright, ejecutar el checklist del SKILL.md y reportar resultado.
 
 Formato de reporte al terminar un cambio:
 ```
