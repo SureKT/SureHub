@@ -44,9 +44,6 @@ export default function Memoria() {
 
   return (
     <div>
-      <p style={{ color: 'var(--text-dim)', fontSize: 13, margin: '0 0 20px' }}>
-        Hechos que Claude recuerda en cada conversación de Telegram.
-      </p>
 
       <form onSubmit={submit} style={{ display: 'flex', gap: 8, marginBottom: 28 }}>
         <input
@@ -66,11 +63,13 @@ export default function Memoria() {
         memorias.length === 0 ? (
           <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Sin memoria guardada.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {memorias.map(m => (
-              <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 14px', background: 'var(--surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)' }}>
-                <span style={{ color: 'var(--text-muted)', fontSize: 11, whiteSpace: 'nowrap', marginTop: 3, minWidth: 28 }}>#{m.id}</span>
-
+              <div key={m.id}
+                style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 0', borderBottom: '1px solid var(--border-dim)' }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
                 {editId === m.id ? (
                   <div style={{ flex: 1, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                     <textarea

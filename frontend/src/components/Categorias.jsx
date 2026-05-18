@@ -76,11 +76,15 @@ export default function Categorias() {
     const mes = resumenMap[c.id]
     const alerta = mes?.alerta
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
-        borderBottom: '1px solid var(--border-dim)',
-        opacity: c.activa ? 1 : 0.55, flexWrap: 'wrap',
-      }}>
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
+          borderBottom: '1px solid var(--border-dim)',
+          opacity: c.activa ? 1 : 0.55, flexWrap: 'wrap',
+        }}
+        onMouseEnter={e => e.currentTarget.style.opacity = c.activa ? '0.8' : '0.45'}
+        onMouseLeave={e => e.currentTarget.style.opacity = c.activa ? '1' : '0.55'}
+      >
         <span style={{ flex: 1, fontSize: 14, color: alerta ? 'var(--red)' : (c.activa ? 'var(--text)' : 'var(--text-dim)'), minWidth: 100 }}>
           {c.nombre}
         </span>

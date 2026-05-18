@@ -91,10 +91,6 @@ export default function Recurrentes() {
 
   return (
     <div>
-      <p style={{ color: 'var(--text-dim)', fontSize: 13, margin: '0 0 20px' }}>
-        Gastos que se generan automáticamente cada mes en la fecha indicada.
-      </p>
-
       {/* Add form */}
       <form onSubmit={submit} style={{ display: 'flex', gap: 8, marginBottom: 28, flexWrap: 'wrap' }}>
         <input placeholder="Nombre (ej: Netflix)" value={form.nombre}
@@ -151,7 +147,11 @@ export default function Recurrentes() {
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {activos.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Sin recurrentes. Añade subscripciones, alquiler, etc.</p>}
             {activos.map(r => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-dim)', flexWrap: 'wrap' }}>
+              <div key={r.id}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-dim)', flexWrap: 'wrap' }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+              >
                 {editId === r.id ? (
                   <>
                     <input value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))}
