@@ -171,7 +171,7 @@ export default function Recurrentes() {
                   <>
                     <span style={{ flex: 1, fontSize: 14, minWidth: 100 }}>{r.nombre}</span>
                     {r.categoria_nombre && (
-                      <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>
+                      <span style={{ background: 'var(--surface3)', color: 'var(--text-dim)', padding: '2px 8px', borderRadius: 10, fontSize: 11 }}>
                         {r.categoria_nombre}
                       </span>
                     )}

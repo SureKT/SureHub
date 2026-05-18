@@ -328,7 +328,7 @@ export default function Gastos() {
                   </td>
                   <td style={td}>
                     {g.categoria
-                      ? <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', padding: '2px 8px', borderRadius: 10, fontSize: 12 }}>{g.categoria.nombre}</span>
+                      ? <span style={{ background: 'var(--surface3)', color: 'var(--text-dim)', padding: '2px 8px', borderRadius: 10, fontSize: 12 }}>{g.categoria.nombre}</span>
                       : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>sin categoría</span>}
                   </td>
                   <td style={{ ...td, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', color: 'var(--text)' }}>{g.cantidad.toFixed(2)}€</td>
@@ -336,7 +336,7 @@ export default function Gastos() {
                     <button onClick={() => setEditId(g.id)} style={btnDangerStyle} title="Editar">✎</button>
                     {confirmDelete === g.id ? (
                       <>
-                        <button onClick={() => deleteMut.mutate(g.id)} style={{ ...btnDangerStyle, color: '#e74c3c' }} title="Confirmar">✓</button>
+                        <button onClick={() => deleteMut.mutate(g.id)} style={{ ...btnDangerStyle, color: 'var(--red)' }} title="Confirmar">✓</button>
                         <button onClick={() => setConfirmDelete(null)} style={btnDangerStyle} title="Cancelar">✕</button>
                       </>
                     ) : (
@@ -354,7 +354,7 @@ export default function Gastos() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20 }}>
               <button onClick={() => setPage(1)} disabled={page === 1} style={btnSecStyle}>«</button>
               <button onClick={() => setPage(p => p - 1)} disabled={page === 1} style={btnSecStyle}>‹</button>
-              <span style={{ color: '#666', fontSize: 13 }}>{page} / {totalPages}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>{page} / {totalPages}</span>
               <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages} style={btnSecStyle}>›</button>
               <button onClick={() => setPage(totalPages)} disabled={page === totalPages} style={btnSecStyle}>»</button>
             </div>
