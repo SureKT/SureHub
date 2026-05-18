@@ -4,6 +4,9 @@ import { getGastos, getCategorias, createGasto, updateGasto, deleteGasto, getMes
 import { useToast } from './Toast'
 import ImportarModal from './ImportarModal'
 
+const formatDate = (dateStr) =>
+  new Date(dateStr).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
+
 const FUENTE_STYLE = {
   telegram:   { bg: 'var(--green-bg)',  color: 'var(--green)',  label: 'tg' },
   importacion:{ bg: 'var(--orange-bg)', color: 'var(--orange)', label: 'imp' },
@@ -322,7 +325,7 @@ export default function Gastos() {
                 <tr key={g.id} style={{ borderBottom: '1px solid var(--border-dim)' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ ...td, color: 'var(--text-dim)', fontSize: 13 }}>{new Date(g.fecha).toLocaleDateString('es-ES')}</td>
+                  <td style={{ ...td, color: 'var(--text-dim)', fontSize: 13 }}>{formatDate(g.fecha)}</td>
                   <td style={td}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {g.descripcion || <span style={{ color: 'var(--text-muted)' }}>—</span>}
