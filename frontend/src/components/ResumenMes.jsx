@@ -22,7 +22,7 @@ function BarraProgreso({ total, estimacion, alerta }) {
   const pct = estimacion > 0 ? Math.min((total / estimacion) * 100, 100) : 0
   const color = alerta ? 'var(--red)' : pct > 75 ? 'var(--orange)' : 'var(--accent)'
   return (
-    <div style={{ background: 'var(--surface3)', borderRadius: 4, height: 3, width: '100%', marginTop: 5 }}>
+    <div style={{ background: 'var(--surface3)', borderRadius: 4, height: 4, width: '100%', marginTop: 5 }}>
       <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: color, transition: 'width 0.3s' }} />
     </div>
   )
