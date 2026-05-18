@@ -3,7 +3,20 @@ import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { getResumen, getEvolucion, getMeses } from '../api'
 
-const COLORS = ['#3498db','#2ecc71','#e74c3c','#f39c12','#9b59b6','#1abc9c','#e67e22','#e91e63','#00bcd4','#8bc34a','#ff5722','#607d8b']
+const COLORS = [
+  '#c8f0dc', // accent mint
+  '#a78bfa', // purple
+  '#fbbf24', // orange
+  '#f87171', // red
+  '#4ade80', // green
+  '#9b9b97', // grey
+  '#7dd3fc', // sky
+  '#f9a8d4', // pink
+  '#86efac', // light green
+  '#c4b5fd', // light purple
+  '#fca5a5', // light red
+  '#fde68a', // light yellow
+]
 
 function BarraProgreso({ total, estimacion, alerta }) {
   const pct = estimacion > 0 ? Math.min((total / estimacion) * 100, 100) : 0
