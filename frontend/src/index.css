@@ -80,15 +80,10 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 * { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.13) transparent; }
 
 /* ── Utilities ── */
-.nav-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-.nav-scroll::-webkit-scrollbar { display: none; }
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-@media (max-width: 600px) {
-  .main-content { padding: 16px 12px !important; }
-  .nav-brand { display: none !important; }
-  .hide-mobile { display: none !important; }
-}
+/* Layout */
+html, body, #root { height: 100%; }
 
 @keyframes slideUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 @keyframes fadeIn  { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
