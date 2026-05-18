@@ -76,3 +76,72 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Local ahora: PC + 3 terminales (backend, bot, frontend)
 - Prod futuro: Hetzner VPS ~€4/mes, Docker, webhook Telegram, Postgres
 - Claude API: ~$5-15/mes uso personal moderado
+
+---
+
+## UI — Design System
+
+El frontend usa la skill `ui-ecosystem`. Antes de cualquier cambio visual, aplicar sus reglas sin excepciones.
+
+### Flujo obligatorio para cambios de UI
+
+**Nunca implementar cambios visuales sin seguir este flujo:**
+
+1. **Proponer antes de codificar** — escribir en texto qué elemento se va a cambiar, por qué viola el design system, y qué solución se va a aplicar. Esperar confirmación.
+2. **Un componente a la vez** — no refactorizar múltiples vistas en un solo paso.
+3. **Autoevaluar al terminar** — ejecutar el checklist del SKILL.md y reportar resultado.
+
+Formato de reporte al terminar un cambio:
+```
+✅ Cambio: [qué se cambió]
+📐 Regla aplicada: [qué regla del SKILL.md]
+🔍 Checklist: [items verificados]
+⚠️ Pendiente: [qué no se ha tocado todavía]
+```
+
+### Reglas inamovibles de UI
+
+1. **Cero azul eléctrico** — no usar `blue-*` de Tailwind. El único acento es `--accent` (#c8f0dc).
+2. **Listas = filas planas** — listas de más de 3 items usan filas con `border-b`, no cards individuales con `rounded-xl` por item.
+3. **Un acento por vista** — `--accent` aparece en máximo un elemento por página.
+4. **El dato más importante manda** — totales y valores clave: mínimo `text-4xl font-light`, no dentro de cards pequeñas.
+5. **Badges de categoría: grises** — `bg-subtle text-muted`, nunca colores de acento.
+6. **Sin date pickers nativos** — `<input type="date">` solo con reset de estilos completo o componente custom.
+7. **Jerarquía tipográfica en 3 niveles**:
+   - Label/sección: `text-xs uppercase tracking-wide text-faint`
+   - Contenido principal: `text-sm text-primary`
+   - Metadata/secundario: `text-xs text-muted`
+
+### Criterios de acabado — checklist obligatorio
+
+**1. Elemento focal por vista**
+Cada vista tiene UN dato tipográficamente dominante (≥28px, font-weight 300) que responde la pregunta principal del usuario. Resumen → total gastado. Recurrentes → total mensual. Si el dato más importante no salta a la vista en 2 segundos, la vista no está terminada.
+
+**2. Estados vacíos diseñados**
+Ningún estado vacío puede ser solo texto. Mínimo: texto `--text-muted` centrado + descripción `text-xs`. Óptimo: icono outline 32px `--text-muted` + título + descripción. Nunca mostrar "Sin X" suelto en pantalla en blanco.
+
+**3. Sin texto de onboarding permanente**
+Las frases descriptivas de qué hace una vista ("Gastos que se generan...") deben eliminarse. Si la UI es autoexplicativa, el texto sobra. Si hace falta contexto, va en tooltip o primera visita — nunca como párrafo fijo visible siempre.
+
+**4. Jerarquía de controles en formularios**
+Si una vista tiene formulario de creación + controles de filtro/acción, deben tener diferente peso visual. El formulario de creación es bloque primario (más espacio, separado visualmente). Los filtros son secundarios (más compactos, menos contraste). Nunca iguales.
+
+**5. Hover states en todo elemento interactivo**
+Botones ghost, filas de lista, textos editables: todos deben tener hover visible. Mínimo: `background: var(--surface3)` en hover. Sin hover = el elemento parece roto o decorativo.
+
+**6. IDs técnicos nunca visibles**
+No mostrar IDs de base de datos al usuario (ej. `#1`, `#42`). Si se necesita identificador, usar orden ordinal contextual o campo semántico.
+
+### Prioridad de mejoras UI pendientes
+1. Azul eléctrico en botones, tabs activas y badges → reemplazar por acento y grises
+2. Cards con border-radius grande en listas de Categorías y Recurrentes → filas planas
+3. Card de TOTAL pequeña en Resumen → hero tipográfico
+4. Dos bloques de controles apilados en Gastos → reorganizar
+5. Tipografía sin jerarquía → aplicar escala de 3 niveles
+
+### Lo que NO hacer en UI
+- No usar criterio estético propio — usar el SKILL.md
+- No "mejorar" elementos que no se han pedido
+- No refactorizar CSS global sin avisar
+- No cambiar la paleta de colores definida en el SKILL.md
+- No usar librerías de componentes externas (MUI, Chakra, etc.) sin preguntar
