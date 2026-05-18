@@ -38,6 +38,7 @@ function exportCSV(gastos, filename = 'gastos.csv') {
 }
 
 const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
+const filterInputStyle = { background: 'var(--surface2)', border: '1px solid var(--border-dim)', color: 'var(--text-dim)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', fontSize: 12 }
 const btnStyle = { background: 'var(--accent)', border: 'none', color: 'var(--bg)', padding: '8px 14px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }
 const btnSecStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text-dim)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13 }
 const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(--text-dim)', padding: '4px 8px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }
@@ -238,34 +239,36 @@ export default function Gastos() {
       {showImportar && <ImportarModal onClose={() => setShowImportar(false)} />}
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={() => setShowImportar(true)}
-          style={{ ...btnSecStyle, fontSize: 12, padding: '6px 12px', marginRight: 4 }}>
-          Importar ING
-        </button>
-        <select value={filters.mes} onChange={e => setFilter('mes', e.target.value)} style={{ ...inputStyle, fontSize: 13 }}>
-          <option value="">Todos los meses</option>
-          {meses.map(m => <option key={`${m.anio}-${m.mes}`} value={`${m.anio}-${m.mes}`}>{m.label}</option>)}
-        </select>
-        <select value={filters.categoria_id} onChange={e => setFilter('categoria_id', e.target.value)} style={{ ...inputStyle, fontSize: 13 }}>
-          <option value="">Todas las categorías</option>
-          {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        </select>
-        <input type="text" placeholder="Buscar descripción..." value={filters.busqueda}
-          onChange={e => setFilter('busqueda', e.target.value)}
-          style={{ ...inputStyle, fontSize: 13, flex: 1, minWidth: 130 }} />
-        <input type="date" value={filters.desde}
-          onChange={e => { setFilter('desde', e.target.value); if (e.target.value) setFilter('mes', '') }}
-          style={{ ...inputStyle, fontSize: 12, colorScheme: 'dark' }} title="Desde" />
-        <input type="date" value={filters.hasta}
-          onChange={e => { setFilter('hasta', e.target.value); if (e.target.value) setFilter('mes', '') }}
-          style={{ ...inputStyle, fontSize: 12, colorScheme: 'dark' }} title="Hasta" />
-        {(filters.mes || filters.categoria_id || filters.busqueda || filters.desde || filters.hasta) && (
-          <button onClick={() => { setFilters({ mes: '', categoria_id: '', busqueda: '', desde: '', hasta: '' }); setPage(1) }}
-            style={{ ...btnSecStyle, fontSize: 12, padding: '6px 12px' }}>
-            Limpiar
+      <div style={{ borderTop: '1px solid var(--border-dim)', paddingTop: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button onClick={() => setShowImportar(true)}
+            style={{ ...btnSecStyle, fontSize: 12, padding: '5px 10px', marginRight: 4 }}>
+            Importar ING
           </button>
-        )}
+          <select value={filters.mes} onChange={e => setFilter('mes', e.target.value)} style={{ ...filterInputStyle, fontSize: 12 }}>
+            <option value="">Todos los meses</option>
+            {meses.map(m => <option key={`${m.anio}-${m.mes}`} value={`${m.anio}-${m.mes}`}>{m.label}</option>)}
+          </select>
+          <select value={filters.categoria_id} onChange={e => setFilter('categoria_id', e.target.value)} style={{ ...filterInputStyle, fontSize: 12 }}>
+            <option value="">Todas las categorías</option>
+            {categorias.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+          <input type="text" placeholder="Buscar..." value={filters.busqueda}
+            onChange={e => setFilter('busqueda', e.target.value)}
+            style={{ ...filterInputStyle, fontSize: 12, flex: 1, minWidth: 120 }} />
+          <input type="date" value={filters.desde}
+            onChange={e => { setFilter('desde', e.target.value); if (e.target.value) setFilter('mes', '') }}
+            style={{ ...filterInputStyle, fontSize: 12, colorScheme: 'dark' }} title="Desde" />
+          <input type="date" value={filters.hasta}
+            onChange={e => { setFilter('hasta', e.target.value); if (e.target.value) setFilter('mes', '') }}
+            style={{ ...filterInputStyle, fontSize: 12, colorScheme: 'dark' }} title="Hasta" />
+          {(filters.mes || filters.categoria_id || filters.busqueda || filters.desde || filters.hasta) && (
+            <button onClick={() => { setFilters({ mes: '', categoria_id: '', busqueda: '', desde: '', hasta: '' }); setPage(1) }}
+              style={{ ...btnSecStyle, fontSize: 12, padding: '5px 10px' }}>
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Count + export */}
