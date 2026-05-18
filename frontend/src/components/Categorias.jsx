@@ -77,8 +77,8 @@ export default function Categorias() {
     const alerta = mes?.alerta
     return (
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px',
-        background: 'var(--surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)',
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
+        borderBottom: '1px solid var(--border-dim)',
         opacity: c.activa ? 1 : 0.55, flexWrap: 'wrap',
       }}>
         <span style={{ flex: 1, fontSize: 14, color: alerta ? 'var(--red)' : (c.activa ? 'var(--text)' : 'var(--text-dim)'), minWidth: 100 }}>
@@ -147,7 +147,7 @@ export default function Categorias() {
           {[['Variable', variable], ['Fijo', fijo]].map(([label, cats]) => (
             <div key={label} style={{ marginBottom: 24 }}>
               <h3 style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, margin: '0 0 10px' }}>{label}</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {cats.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin categorías</p>}
                 {cats.map(c => <CatRow key={c.id} c={c} />)}
               </div>
@@ -161,7 +161,7 @@ export default function Categorias() {
                 {showInactivas ? '▾' : '▸'} Inactivas ({inactivas.length})
               </button>
               {showInactivas && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 10 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
                   {inactivas.map(c => <CatRow key={c.id} c={c} />)}
                 </div>
               )}

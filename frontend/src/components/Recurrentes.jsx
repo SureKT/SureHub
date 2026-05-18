@@ -148,10 +148,10 @@ export default function Recurrentes() {
 
       {isLoading ? <p style={{ color: 'var(--text-dim)' }}>Cargando...</p> : (
         <>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {activos.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Sin recurrentes. Añade subscripciones, alquiler, etc.</p>}
             {activos.map(r => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'var(--surface)', border: '1px solid var(--border-dim)', borderRadius: 'var(--radius)', flexWrap: 'wrap' }}>
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-dim)', flexWrap: 'wrap' }}>
                 {editId === r.id ? (
                   <>
                     <input value={editForm.nombre} onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))}
