@@ -69,12 +69,6 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - API prefix: `/api/finance` (categories, expenses, summary, evolution, months, import)
 - Ports: backend 8001, frontend 5174
 
-## Módulos pendientes (por orden de prioridad acordado)
-1. Mejoras dashboard finanzas (en curso)
-2. Noticias/briefings (aparcado hasta nuevo aviso)
-3. MCP server propio
-4. Automatizaciones
-
 ## Infraestructura objetivo
 - Local ahora: PC + 3 terminales (backend, bot, frontend)
 - Prod futuro: Hetzner VPS ~€4/mes, Docker, webhook Telegram, Postgres
@@ -137,11 +131,7 @@ Botones ghost, filas de lista, textos editables: todos deben tener hover visible
 No mostrar IDs de base de datos al usuario (ej. `#1`, `#42`). Si se necesita identificador, usar orden ordinal contextual o campo semántico.
 
 ### Prioridad de mejoras UI pendientes
-1. Azul eléctrico en botones, tabs activas y badges → reemplazar por acento y grises
-2. Cards con border-radius grande en listas de Categorías y Recurrentes → filas planas
-3. Card de TOTAL pequeña en Resumen → hero tipográfico
-4. Dos bloques de controles apilados en Gastos → reorganizar
-5. Tipografía sin jerarquía → aplicar escala de 3 niveles
+~~Todas completadas.~~ ✅ Design system aplicado en todas las vistas.
 
 ### Lo que NO hacer en UI
 - No usar criterio estético propio — usar el SKILL.md
@@ -149,3 +139,48 @@ No mostrar IDs de base de datos al usuario (ej. `#1`, `#42`). Si se necesita ide
 - No refactorizar CSS global sin avisar
 - No cambiar la paleta de colores definida en el SKILL.md
 - No usar librerías de componentes externas (MUI, Chakra, etc.) sin preguntar
+
+---
+
+## Plugins de Claude Code
+
+Plugins instalados globalmente en esta máquina. Si hay que reinstalar en una máquina nueva:
+
+### superpowers
+Plugin oficial de Jesse Vincent con skills para TDD, debugging, patrones de colaboración.
+
+**Instalar:** Añadir a `~/.claude/settings.json`:
+```json
+{
+  "extraKnownMarketplaces": {
+    "superpowers-marketplace": {
+      "source": { "source": "github", "repo": "obra/superpowers-marketplace" }
+    }
+  },
+  "enabledPlugins": {
+    "superpowers@superpowers-marketplace": true
+  }
+}
+```
+Claude Code descarga el marketplace automáticamente al arrancar.
+Repo: https://github.com/obra/superpowers
+
+### caveman
+Modo de comunicación ultra-comprimido (~65-75% menos tokens). Activa con `/caveman` o "caveman mode".
+
+**Instalar (Windows):**
+```powershell
+$tmp = "$env:TEMP\caveman-install.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.ps1" -OutFile $tmp
+& $tmp
+```
+Luego copiar los SKILL.md a `~/.claude/skills/`:
+```powershell
+$base = "$env:USERPROFILE\.claude\skills"
+$src = "<ruta-donde-corriste-el-instalador>\.agents\skills"
+foreach ($s in @("caveman","cavecrew","caveman-commit","caveman-compress","caveman-help","caveman-review","caveman-stats")) {
+  New-Item -ItemType Directory -Force "$base\$s" | Out-Null
+  Copy-Item "$src\$s\SKILL.md" "$base\$s\SKILL.md" -Force
+}
+```
+Repo: https://github.com/juliusbrussee/caveman
