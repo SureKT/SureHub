@@ -147,22 +147,19 @@ No mostrar IDs de base de datos al usuario (ej. `#1`, `#42`). Si se necesita ide
 Plugins instalados globalmente en esta máquina. Si hay que reinstalar en una máquina nueva:
 
 ### superpowers
-Plugin oficial de Jesse Vincent con skills para TDD, debugging, patrones de colaboración.
+Skills para TDD, debugging, brainstorming, patrones de desarrollo.
 
-**Instalar:** Añadir a `~/.claude/settings.json`:
-```json
-{
-  "extraKnownMarketplaces": {
-    "superpowers-marketplace": {
-      "source": { "source": "github", "repo": "obra/superpowers-marketplace" }
-    }
-  },
-  "enabledPlugins": {
-    "superpowers@superpowers-marketplace": true
-  }
+**Instalar (método manual — `/plugin` no funciona en modo agente):**
+```powershell
+git clone https://github.com/obra/superpowers.git "$env:TEMP\superpowers-tmp"
+$src = "$env:TEMP\superpowers-tmp\skills"
+$dst = "$env:USERPROFILE\.claude\skills"
+Get-ChildItem $src -Directory | ForEach-Object {
+  New-Item -ItemType Directory -Force "$dst\$($_.Name)" | Out-Null
+  Copy-Item "$src\$($_.Name)\SKILL.md" "$dst\$($_.Name)\SKILL.md" -Force
 }
 ```
-Claude Code descarga el marketplace automáticamente al arrancar.
+Skills instalados: brainstorming, executing-plans, subagent-driven-development, systematic-debugging, test-driven-development, writing-plans, y más.
 Repo: https://github.com/obra/superpowers
 
 ### caveman
