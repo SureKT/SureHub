@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     TELEGRAM_MODE: str = "polling"
     WEBHOOK_URL: str = ""
 
+    # Spotify
+    SPOTIFY_CLIENT_ID: str = ""
+    SPOTIFY_CLIENT_SECRET: str = ""
+    SPOTIFY_REDIRECT_URI: str = "http://localhost:8000/spotify/callback"
+
     @property
     def allowed_user_ids(self) -> list[int]:
         return [int(uid.strip()) for uid in self.TELEGRAM_ALLOWED_USER_IDS.split(",")]
