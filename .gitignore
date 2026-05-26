@@ -8,3 +8,7 @@ temp/
 venv/
 frontend/dist/
 frontend/node_modules/
+
+# Playwright MCP output
+.playwright-mcp/
+playwright-screenshots/

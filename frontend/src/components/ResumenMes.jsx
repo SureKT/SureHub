@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
-import { getResumen, getEvolucion, getMeses } from '../api'
+import { getSummary, getEvolution, getMonths } from '../api'
 
 const COLORS = [
   '#c8f0dc', // accent mint
@@ -18,9 +18,9 @@ const COLORS = [
   '#fde68a', // light yellow
 ]
 
-function BarraProgreso({ total, estimacion, alerta }) {
-  const pct = estimacion > 0 ? Math.min((total / estimacion) * 100, 100) : 0
-  const color = alerta ? 'var(--red)' : pct > 75 ? 'var(--orange)' : 'var(--accent)'
+function ProgressBar({ total, estimate, alert }) {
+  const pct = estimate > 0 ? Math.min((total / estimate) * 100, 100) : 0
+  const color = alert ? 'var(--red)' : pct > 75 ? 'var(--orange)' : 'var(--accent)'
   return (
     <div style={{ background: 'var(--surface3)', borderRadius: 4, height: 4, width: '100%', marginTop: 5 }}>
       <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: color, transition: 'width 0.3s' }} />
@@ -29,36 +29,36 @@ function BarraProgreso({ total, estimacion, alerta }) {
 }
 
 export default function ResumenMes() {
-  const [mesSelec, setMesSelec] = useState(null)
+  const [selectedMonth, setSelectedMonth] = useState(null)
 
-  const { data: meses = [] } = useQuery({ queryKey: ['meses'], queryFn: getMeses })
-  const params = mesSelec ? { anio: mesSelec.anio, mes: mesSelec.mes } : {}
+  const { data: months = [] } = useQuery({ queryKey: ['months'], queryFn: getMonths })
+  const params = selectedMonth ? { year: selectedMonth.year, month: selectedMonth.month } : {}
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['resumen', mesSelec],
-    queryFn: () => getResumen(params),
-    refetchInterval: mesSelec ? false : 30000,
+    queryKey: ['summary', selectedMonth],
+    queryFn: () => getSummary(params),
+    refetchInterval: selectedMonth ? false : 30000,
   })
-  const { data: evol = [] } = useQuery({ queryKey: ['evolucion'], queryFn: () => getEvolucion(12) })
+  const { data: evolution = [] } = useQuery({ queryKey: ['evolution'], queryFn: () => getEvolution(12) })
 
-  if (isLoading) return <p style={{ color: 'var(--text-dim)' }}>Cargando...</p>
-  if (isError || !data) return <p style={{ color: 'var(--red)' }}>Error al cargar. ¿Está el backend arrancado?</p>
+  if (isLoading) return <p style={{ color: 'var(--text-dim)' }}>Loading...</p>
+  if (isError || !data) return <p style={{ color: 'var(--red)' }}>Error loading data. Is the backend running?</p>
 
-  const variable = data.categorias.filter(c => c.tipo === 'variable' && (c.total > 0 || c.estimacion > 0))
-  const fijo = data.categorias.filter(c => c.tipo === 'fijo' && (c.total > 0 || c.estimacion > 0))
-  const pieData = data.categorias.filter(c => c.total > 0).map(c => ({ name: c.nombre, value: c.total }))
+  const variable = data.categories.filter(c => c.type === 'variable' && (c.total > 0 || c.estimate > 0))
+  const fixed = data.categories.filter(c => c.type === 'fixed' && (c.total > 0 || c.estimate > 0))
+  const pieData = data.categories.filter(c => c.total > 0).map(c => ({ name: c.name, value: c.total }))
   const topCat = pieData.length > 0 ? [...pieData].sort((a, b) => b.value - a.value)[0] : null
 
-  const evolLen = evol.length
-  const totalActual = data.total
-  const totalAnterior = evolLen >= 2 ? evol[evolLen - 2]?.total : null
-  const diff = totalAnterior && totalAnterior > 0 ? ((totalActual - totalAnterior) / totalAnterior) * 100 : null
-  const alertas = data.categorias.filter(c => c.alerta)
+  const evolLen = evolution.length
+  const totalNow = data.total
+  const totalPrev = evolLen >= 2 ? evolution[evolLen - 2]?.total : null
+  const diff = totalPrev && totalPrev > 0 ? ((totalNow - totalPrev) / totalPrev) * 100 : null
+  const alerts = data.categories.filter(c => c.alert)
 
   const metaItems = []
-  if (diff !== null && !mesSelec) {
+  if (diff !== null && !selectedMonth) {
     const diffColor = diff > 10 ? 'var(--red)' : diff < -5 ? 'var(--green)' : 'var(--text-dim)'
     metaItems.push(
-      <span key="diff" style={{ color: diffColor }}>{diff >= 0 ? '+' : ''}{diff.toFixed(1)}% vs anterior</span>
+      <span key="diff" style={{ color: diffColor }}>{diff >= 0 ? '+' : ''}{diff.toFixed(1)}% vs prev</span>
     )
   }
   if (topCat) {
@@ -66,9 +66,9 @@ export default function ResumenMes() {
       <span key="top" style={{ color: 'var(--text-dim)' }}>Top: {topCat.name} {topCat.value.toFixed(0)}€</span>
     )
   }
-  if (alertas.length > 0) {
+  if (alerts.length > 0) {
     metaItems.push(
-      <span key="alertas" style={{ color: 'var(--red)' }}>{alertas.length} alerta{alertas.length > 1 ? 's' : ''}</span>
+      <span key="alerts" style={{ color: 'var(--red)' }}>{alerts.length} alert{alerts.length > 1 ? 's' : ''}</span>
     )
   }
 
@@ -77,11 +77,11 @@ export default function ResumenMes() {
       {/* Hero block */}
       <div style={{ marginBottom: 32 }}>
         <select
-          value={mesSelec ? `${mesSelec.anio}-${mesSelec.mes}` : ''}
+          value={selectedMonth ? `${selectedMonth.year}-${selectedMonth.month}` : ''}
           onChange={e => {
-            if (!e.target.value) { setMesSelec(null); return }
-            const [a, m] = e.target.value.split('-')
-            setMesSelec({ anio: parseInt(a), mes: parseInt(m) })
+            if (!e.target.value) { setSelectedMonth(null); return }
+            const [y, m] = e.target.value.split('-')
+            setSelectedMonth({ year: parseInt(y), month: parseInt(m) })
           }}
           style={{
             background: 'none', border: 'none', color: 'var(--text-muted)',
@@ -90,9 +90,9 @@ export default function ResumenMes() {
             fontFamily: 'inherit', fontWeight: 500,
           }}
         >
-          <option value="">Mes actual</option>
-          {meses.map(m => (
-            <option key={`${m.anio}-${m.mes}`} value={`${m.anio}-${m.mes}`}>{m.label}</option>
+          <option value="">Current month</option>
+          {months.map(m => (
+            <option key={`${m.year}-${m.month}`} value={`${m.year}-${m.month}`}>{m.label}</option>
           ))}
         </select>
 
@@ -100,7 +100,7 @@ export default function ResumenMes() {
           fontSize: 48, fontWeight: 300, fontVariantNumeric: 'tabular-nums',
           color: 'var(--text)', letterSpacing: '-1px', lineHeight: 1,
         }}>
-          {totalActual.toFixed(2)}€
+          {totalNow.toFixed(2)}€
         </div>
 
         {metaItems.length > 0 && (
@@ -118,45 +118,45 @@ export default function ResumenMes() {
       {/* Separator */}
       <div style={{ borderBottom: '1px solid var(--border-dim)', marginBottom: 24 }} />
 
-      {/* Categorías */}
-      {[['Variable', variable], ['Fijo', fijo]].map(([label, cats]) => cats.length > 0 && (
+      {/* Categories */}
+      {[['Variable', variable], ['Fixed', fixed]].map(([label, cats]) => cats.length > 0 && (
         <div key={label} style={{ marginBottom: 24 }}>
           <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 10 }}>{label}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {cats.map(c => (
               <div key={c.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                  <span style={{ color: c.alerta ? 'var(--red)' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {c.nombre}
-                    {c.n_gastos > 0 && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{c.n_gastos}</span>}
+                  <span style={{ color: c.alert ? 'var(--red)' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {c.name}
+                    {c.expense_count > 0 && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{c.expense_count}</span>}
                   </span>
                   <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-                    <span style={{ color: c.alerta ? 'var(--red)' : 'var(--text)', fontWeight: 500 }}>{c.total.toFixed(2)}€</span>
-                    {c.estimacion > 0 && <span style={{ color: 'var(--text-muted)' }}> / {c.estimacion.toFixed(0)}€</span>}
+                    <span style={{ color: c.alert ? 'var(--red)' : 'var(--text)', fontWeight: 500 }}>{c.total.toFixed(2)}€</span>
+                    {c.estimate > 0 && <span style={{ color: 'var(--text-muted)' }}> / {c.estimate.toFixed(0)}€</span>}
                   </span>
                 </div>
-                {c.estimacion > 0 && <BarraProgreso total={c.total} estimacion={c.estimacion} alerta={c.alerta} />}
+                {c.estimate > 0 && <ProgressBar total={c.total} estimate={c.estimate} alert={c.alert} />}
               </div>
             ))}
           </div>
         </div>
       ))}
 
-      {variable.length === 0 && fijo.length === 0 && (
+      {variable.length === 0 && fixed.length === 0 && (
         <div style={{ textAlign: 'center', padding: '48px 0' }}>
           <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--text-muted)', lineHeight: 1 }}>○</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 14, fontWeight: 500 }}>Sin gastos este mes</div>
-          <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Los gastos aparecerán aquí cuando los añadas</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 14, fontWeight: 500 }}>No expenses this month</div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Expenses will appear here once added</div>
         </div>
       )}
 
       {/* Charts */}
       <div className="charts-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24, marginTop: 40 }}>
-        {evol.length > 1 && (
+        {evolution.length > 1 && (
           <div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 }}>Evolución 12 meses</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 }}>12-month evolution</div>
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={evol} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={evolution} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                 <XAxis dataKey="label" tick={{ fill: 'var(--text-muted)', fontSize: 9 }} />
                 <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 9 }} />
                 <Tooltip contentStyle={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }} formatter={v => `${v.toFixed(2)}€`} />
@@ -168,7 +168,7 @@ export default function ResumenMes() {
 
         {pieData.length > 0 && (
           <div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 }}>Por categoría</div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 16 }}>By category</div>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
                 <Pie data={pieData} dataKey="value" cx="50%" cy="50%" outerRadius={65} label={false}>

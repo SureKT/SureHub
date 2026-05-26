@@ -19,7 +19,7 @@ const qc = new QueryClient({
 })
 
 function App() {
-  const [view, setView] = useState('resumen')
+  const [view, setView] = useState('summary')
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('sidebar-collapsed') === 'true'
   )
@@ -43,11 +43,11 @@ function App() {
             onToggleCollapse={toggleCollapse}
           />
           <main style={{ flex: 1, padding: '32px 48px', overflowY: 'auto', minWidth: 0 }}>
-            {view === 'resumen' && <ResumenMes />}
-            {view === 'gastos' && <Gastos />}
-            {view === 'categorias' && <Categorias />}
-            {view === 'recurrentes' && <Recurrentes />}
-            {view === 'memoria' && <Memoria />}
+            {view === 'summary' && <ResumenMes />}
+            {view === 'expenses' && <Gastos />}
+            {view === 'categories' && <Categorias />}
+            {view === 'recurring' && <Recurrentes />}
+            {view === 'memory' && <Memoria />}
           </main>
         </div>
       </ToastProvider>

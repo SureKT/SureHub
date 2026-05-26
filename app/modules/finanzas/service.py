@@ -1,286 +1,284 @@
 from calendar import monthrange
 from datetime import datetime, timezone
 from sqlmodel import Session, select, func
-from app.modules.finanzas.models import Categoria, Gasto, GastoRecurrente
+from app.modules.finanzas.models import Category, Expense, RecurringExpense
 
 
-# --- Categorias ---
+# --- Categories ---
 
-def crear_categoria(session: Session, nombre: str, tipo: str, estimacion: float = 0.0) -> Categoria:
-    cat = Categoria(nombre=nombre, tipo=tipo, estimacion_mensual=estimacion)
+def create_category(session: Session, name: str, type: str, estimate: float = 0.0) -> Category:
+    cat = Category(name=name, type=type, monthly_estimate=estimate)
     session.add(cat)
     session.commit()
     session.refresh(cat)
     return cat
 
 
-def listar_categorias(session: Session, solo_activas: bool = True) -> list[Categoria]:
-    q = select(Categoria)
-    if solo_activas:
-        q = q.where(Categoria.activa == True)  # noqa: E712
-    return list(session.exec(q.order_by(Categoria.tipo, Categoria.nombre)).all())
+def list_categories(session: Session, active_only: bool = True) -> list[Category]:
+    q = select(Category)
+    if active_only:
+        q = q.where(Category.active == True)  # noqa: E712
+    return list(session.exec(q.order_by(Category.type, Category.name)).all())
 
 
-def buscar_categoria(session: Session, nombre: str) -> Categoria | None:
+def find_category(session: Session, name: str) -> Category | None:
     return session.exec(
-        select(Categoria).where(func.lower(Categoria.nombre) == nombre.lower())
+        select(Category).where(func.lower(Category.name) == name.lower())
     ).first()
 
 
-# --- Gastos ---
+# --- Expenses ---
 
-def registrar_gasto(session: Session, cantidad: float, categoria_id: int = None,
-                    descripcion: str = None, fuente: str = "telegram") -> Gasto:
-    gasto = Gasto(cantidad=cantidad, categoria_id=categoria_id,
-                  descripcion=descripcion, fuente=fuente)
-    session.add(gasto)
+def register_expense(session: Session, amount: float, category_id: int = None,
+                     description: str = None, source: str = "telegram") -> Expense:
+    expense = Expense(amount=amount, category_id=category_id,
+                      description=description, source=source)
+    session.add(expense)
     session.commit()
-    session.refresh(gasto)
-    return gasto
+    session.refresh(expense)
+    return expense
 
 
-def get_gastos_filtrados(session: Session, anio: int = None, mes: int = None,
-                          categoria_id: int = None, busqueda: str = None,
-                          desde_str: str = None, hasta_str: str = None,
-                          page: int = 1, per_page: int = 50,
-                          orden: str = "fecha", asc: bool = False
-                          ) -> tuple[list[tuple[Gasto, Categoria | None]], int]:
-    q = select(Gasto)
+def get_expenses_filtered(session: Session, year: int = None, month: int = None,
+                           category_id: int = None, search: str = None,
+                           from_str: str = None, to_str: str = None,
+                           page: int = 1, per_page: int = 50,
+                           order: str = "date", asc: bool = False
+                           ) -> tuple[list[tuple[Expense, Category | None]], int]:
+    q = select(Expense)
 
-    if desde_str or hasta_str:
-        if desde_str:
-            d = datetime.fromisoformat(desde_str)
-            q = q.where(Gasto.fecha >= d.replace(tzinfo=timezone.utc))
-        if hasta_str:
-            h = datetime.fromisoformat(hasta_str).replace(hour=23, minute=59, second=59)
-            q = q.where(Gasto.fecha <= h.replace(tzinfo=timezone.utc))
-    elif anio and mes:
-        desde = datetime(anio, mes, 1, tzinfo=timezone.utc)
-        dias = monthrange(anio, mes)[1]
-        hasta = datetime(anio, mes, dias, 23, 59, 59, tzinfo=timezone.utc)
-        q = q.where(Gasto.fecha >= desde).where(Gasto.fecha <= hasta)
-    elif anio:
-        desde = datetime(anio, 1, 1, tzinfo=timezone.utc)
-        hasta = datetime(anio, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
-        q = q.where(Gasto.fecha >= desde).where(Gasto.fecha <= hasta)
+    if from_str or to_str:
+        if from_str:
+            d = datetime.fromisoformat(from_str)
+            q = q.where(Expense.date >= d.replace(tzinfo=timezone.utc))
+        if to_str:
+            h = datetime.fromisoformat(to_str).replace(hour=23, minute=59, second=59)
+            q = q.where(Expense.date <= h.replace(tzinfo=timezone.utc))
+    elif year and month:
+        from_ = datetime(year, month, 1, tzinfo=timezone.utc)
+        days = monthrange(year, month)[1]
+        to = datetime(year, month, days, 23, 59, 59, tzinfo=timezone.utc)
+        q = q.where(Expense.date >= from_).where(Expense.date <= to)
+    elif year:
+        from_ = datetime(year, 1, 1, tzinfo=timezone.utc)
+        to = datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+        q = q.where(Expense.date >= from_).where(Expense.date <= to)
 
-    if categoria_id:
-        q = q.where(Gasto.categoria_id == categoria_id)
+    if category_id:
+        q = q.where(Expense.category_id == category_id)
 
-    if busqueda:
-        q = q.where(Gasto.descripcion.ilike(f"%{busqueda}%"))
+    if search:
+        q = q.where(Expense.description.ilike(f"%{search}%"))
 
     total = session.exec(select(func.count()).select_from(q.subquery())).first() or 0
 
-    col = getattr(Gasto, orden, Gasto.fecha)
+    col = getattr(Expense, order, Expense.date)
     q = q.order_by(col if asc else col.desc())
     q = q.offset((page - 1) * per_page).limit(per_page)
 
-    gastos = list(session.exec(q).all())
+    expenses = list(session.exec(q).all())
     result = []
-    for g in gastos:
-        cat = session.get(Categoria, g.categoria_id) if g.categoria_id else None
-        result.append((g, cat))
+    for e in expenses:
+        cat = session.get(Category, e.category_id) if e.category_id else None
+        result.append((e, cat))
     return result, total
 
 
-def ultimos_gastos(session: Session, n: int = 5) -> list[tuple[Gasto, Categoria | None]]:
-    gastos = list(session.exec(select(Gasto).order_by(Gasto.fecha.desc()).limit(n)).all())
+def latest_expenses(session: Session, n: int = 5) -> list[tuple[Expense, Category | None]]:
+    expenses = list(session.exec(select(Expense).order_by(Expense.date.desc()).limit(n)).all())
     result = []
-    for g in gastos:
-        cat = session.get(Categoria, g.categoria_id) if g.categoria_id else None
-        result.append((g, cat))
+    for e in expenses:
+        cat = session.get(Category, e.category_id) if e.category_id else None
+        result.append((e, cat))
     return result
 
 
-def _inicio_fin_mes(anio: int, mes: int) -> tuple[datetime, datetime]:
-    dias = monthrange(anio, mes)[1]
+def _month_range(year: int, month: int) -> tuple[datetime, datetime]:
+    days = monthrange(year, month)[1]
     return (
-        datetime(anio, mes, 1, tzinfo=timezone.utc),
-        datetime(anio, mes, dias, 23, 59, 59, tzinfo=timezone.utc),
+        datetime(year, month, 1, tzinfo=timezone.utc),
+        datetime(year, month, days, 23, 59, 59, tzinfo=timezone.utc),
     )
 
 
-def total_mes_categoria(session: Session, categoria_id: int,
-                         anio: int = None, mes: int = None) -> float:
-    if not anio or not mes:
-        ahora = datetime.now(timezone.utc)
-        anio, mes = ahora.year, ahora.month
-    desde, hasta = _inicio_fin_mes(anio, mes)
+def month_total_by_category(session: Session, category_id: int,
+                             year: int = None, month: int = None) -> float:
+    if not year or not month:
+        now = datetime.now(timezone.utc)
+        year, month = now.year, now.month
+    from_, to = _month_range(year, month)
     result = session.exec(
-        select(func.sum(Gasto.cantidad))
-        .where(Gasto.categoria_id == categoria_id)
-        .where(Gasto.fecha >= desde)
-        .where(Gasto.fecha <= hasta)
+        select(func.sum(Expense.amount))
+        .where(Expense.category_id == category_id)
+        .where(Expense.date >= from_)
+        .where(Expense.date <= to)
     ).first()
     return result or 0.0
 
 
-def resumen_mes(session: Session, anio: int = None, mes: int = None) -> list[dict]:
-    ahora = datetime.now(timezone.utc)
-    if not anio:
-        anio = ahora.year
-    if not mes:
-        mes = ahora.month
+def month_summary(session: Session, year: int = None, month: int = None) -> list[dict]:
+    now = datetime.now(timezone.utc)
+    if not year:
+        year = now.year
+    if not month:
+        month = now.month
 
-    dias_mes = monthrange(anio, mes)[1]
-    es_mes_actual = (anio == ahora.year and mes == ahora.month)
-    fraccion = (ahora.day / dias_mes) if es_mes_actual else 1.0
-    desde, hasta = _inicio_fin_mes(anio, mes)
+    days_in_month = monthrange(year, month)[1]
+    is_current = (year == now.year and month == now.month)
+    fraction = (now.day / days_in_month) if is_current else 1.0
+    from_, to = _month_range(year, month)
 
-    # Single query: sum + count grouped by category
     rows = session.exec(
-        select(Gasto.categoria_id, func.sum(Gasto.cantidad), func.count(Gasto.id))
-        .where(Gasto.fecha >= desde)
-        .where(Gasto.fecha <= hasta)
-        .group_by(Gasto.categoria_id)
+        select(Expense.category_id, func.sum(Expense.amount), func.count(Expense.id))
+        .where(Expense.date >= from_)
+        .where(Expense.date <= to)
+        .group_by(Expense.category_id)
     ).all()
     totals = {cat_id: (float(total or 0), int(count or 0)) for cat_id, total, count in rows}
 
-    categorias = listar_categorias(session)
-    resultado = []
-    for cat in categorias:
-        total, n_gastos = totals.get(cat.id, (0.0, 0))
-        prediccion = round(cat.estimacion_mensual * fraccion, 2)
-        alerta = total > cat.estimacion_mensual and cat.estimacion_mensual > 0
-        resultado.append({
+    categories = list_categories(session)
+    result = []
+    for cat in categories:
+        total, n_expenses = totals.get(cat.id, (0.0, 0))
+        forecast = round(cat.monthly_estimate * fraction, 2)
+        alert = total > cat.monthly_estimate and cat.monthly_estimate > 0
+        result.append({
             "id": cat.id,
-            "nombre": cat.nombre,
-            "tipo": cat.tipo,
-            "estimacion": cat.estimacion_mensual,
-            "prediccion": prediccion,
+            "name": cat.name,
+            "type": cat.type,
+            "estimate": cat.monthly_estimate,
+            "forecast": forecast,
             "total": total,
-            "n_gastos": n_gastos,
-            "alerta": alerta,
+            "expense_count": n_expenses,
+            "alert": alert,
         })
-    return resultado
+    return result
 
 
-def total_mes_global(session: Session, anio: int = None, mes: int = None) -> float:
-    if not anio or not mes:
-        ahora = datetime.now(timezone.utc)
-        anio, mes = ahora.year, ahora.month
-    desde, hasta = _inicio_fin_mes(anio, mes)
+def month_total(session: Session, year: int = None, month: int = None) -> float:
+    if not year or not month:
+        now = datetime.now(timezone.utc)
+        year, month = now.year, now.month
+    from_, to = _month_range(year, month)
     result = session.exec(
-        select(func.sum(Gasto.cantidad))
-        .where(Gasto.fecha >= desde)
-        .where(Gasto.fecha <= hasta)
+        select(func.sum(Expense.amount))
+        .where(Expense.date >= from_)
+        .where(Expense.date <= to)
     ).first()
     return result or 0.0
 
 
-def evolucion_mensual(session: Session, meses: int = 12) -> list[dict]:
-    ahora = datetime.now(timezone.utc)
-    resultado = []
-    for i in range(meses - 1, -1, -1):
-        mes = ahora.month - i
-        anio = ahora.year
-        while mes <= 0:
-            mes += 12
-            anio -= 1
-        total = total_mes_global(session, anio, mes)
-        resultado.append({"anio": anio, "mes": mes, "total": total,
-                           "label": f"{mes:02d}/{anio}"})
-    return resultado
+def monthly_evolution(session: Session, months: int = 12) -> list[dict]:
+    now = datetime.now(timezone.utc)
+    result = []
+    for i in range(months - 1, -1, -1):
+        month = now.month - i
+        year = now.year
+        while month <= 0:
+            month += 12
+            year -= 1
+        total = month_total(session, year, month)
+        result.append({"year": year, "month": month, "total": total,
+                        "label": f"{month:02d}/{year}"})
+    return result
 
 
-def meses_disponibles(session: Session) -> list[dict]:
+def available_months(session: Session) -> list[dict]:
     rows = session.exec(
-        select(func.strftime('%Y', Gasto.fecha), func.strftime('%m', Gasto.fecha))
-        .group_by(func.strftime('%Y', Gasto.fecha), func.strftime('%m', Gasto.fecha))
-        .order_by(func.strftime('%Y', Gasto.fecha).desc(), func.strftime('%m', Gasto.fecha).desc())
+        select(func.strftime('%Y', Expense.date), func.strftime('%m', Expense.date))
+        .group_by(func.strftime('%Y', Expense.date), func.strftime('%m', Expense.date))
+        .order_by(func.strftime('%Y', Expense.date).desc(), func.strftime('%m', Expense.date).desc())
     ).all()
-    return [{"anio": int(a), "mes": int(m), "label": f"{int(m):02d}/{a}"} for a, m in rows]
+    return [{"year": int(y), "month": int(m), "label": f"{int(m):02d}/{y}"} for y, m in rows]
 
 
-# --- Recurrentes ---
+# --- Recurring ---
 
-def listar_recurrentes(session: Session, anio: int = None, mes: int = None) -> list[dict]:
-    ahora = datetime.now(timezone.utc)
-    if not anio:
-        anio = ahora.year
-    if not mes:
-        mes = ahora.month
-    desde, hasta = _inicio_fin_mes(anio, mes)
+def list_recurring(session: Session, year: int = None, month: int = None) -> list[dict]:
+    now = datetime.now(timezone.utc)
+    if not year:
+        year = now.year
+    if not month:
+        month = now.month
+    from_, to = _month_range(year, month)
 
-    recurrentes = list(session.exec(
-        select(GastoRecurrente).order_by(GastoRecurrente.dia, GastoRecurrente.nombre)
+    recurring = list(session.exec(
+        select(RecurringExpense).order_by(RecurringExpense.day, RecurringExpense.name)
     ).all())
 
-    # Single query for all generated gastos this month
-    generados_ids = {
-        g.recurrente_id
-        for g in session.exec(
-            select(Gasto)
-            .where(Gasto.recurrente_id.is_not(None))
-            .where(Gasto.fecha >= desde)
-            .where(Gasto.fecha <= hasta)
+    generated_ids = {
+        e.recurring_id
+        for e in session.exec(
+            select(Expense)
+            .where(Expense.recurring_id.is_not(None))
+            .where(Expense.date >= from_)
+            .where(Expense.date <= to)
         ).all()
     }
 
     result = []
-    for r in recurrentes:
-        cat = session.get(Categoria, r.categoria_id) if r.categoria_id else None
+    for r in recurring:
+        cat = session.get(Category, r.category_id) if r.category_id else None
         result.append({
             "id": r.id,
-            "nombre": r.nombre,
-            "cantidad": r.cantidad,
-            "categoria_id": r.categoria_id,
-            "categoria_nombre": cat.nombre if cat else None,
-            "dia": r.dia,
-            "activo": r.activo,
-            "generado_este_mes": r.id in generados_ids,
+            "name": r.name,
+            "amount": r.amount,
+            "category_id": r.category_id,
+            "category_name": cat.name if cat else None,
+            "day": r.day,
+            "active": r.active,
+            "generated_this_month": r.id in generated_ids,
         })
     return result
 
 
-def crear_recurrente(session: Session, nombre: str, cantidad: float,
-                     categoria_id: int = None, dia: int = 1) -> GastoRecurrente:
-    r = GastoRecurrente(nombre=nombre, cantidad=cantidad, categoria_id=categoria_id, dia=dia)
+def create_recurring(session: Session, name: str, amount: float,
+                     category_id: int = None, day: int = 1) -> RecurringExpense:
+    r = RecurringExpense(name=name, amount=amount, category_id=category_id, day=day)
     session.add(r)
     session.commit()
     session.refresh(r)
     return r
 
 
-def generar_recurrentes(session: Session, anio: int = None, mes: int = None) -> dict:
-    ahora = datetime.now(timezone.utc)
-    if not anio:
-        anio = ahora.year
-    if not mes:
-        mes = ahora.month
-    desde, hasta = _inicio_fin_mes(anio, mes)
+def generate_recurring(session: Session, year: int = None, month: int = None) -> dict:
+    now = datetime.now(timezone.utc)
+    if not year:
+        year = now.year
+    if not month:
+        month = now.month
+    from_, to = _month_range(year, month)
 
-    recurrentes = list(session.exec(
-        select(GastoRecurrente).where(GastoRecurrente.activo == True)  # noqa: E712
+    recurring = list(session.exec(
+        select(RecurringExpense).where(RecurringExpense.active == True)  # noqa: E712
     ).all())
 
-    generados_ids = {
-        g.recurrente_id
-        for g in session.exec(
-            select(Gasto)
-            .where(Gasto.recurrente_id.is_not(None))
-            .where(Gasto.fecha >= desde)
-            .where(Gasto.fecha <= hasta)
+    generated_ids = {
+        e.recurring_id
+        for e in session.exec(
+            select(Expense)
+            .where(Expense.recurring_id.is_not(None))
+            .where(Expense.date >= from_)
+            .where(Expense.date <= to)
         ).all()
     }
 
-    generados, saltados = [], []
-    for r in recurrentes:
-        if r.id in generados_ids:
-            saltados.append(r.nombre)
+    generated, skipped = [], []
+    for r in recurring:
+        if r.id in generated_ids:
+            skipped.append(r.name)
             continue
-        dia_real = min(r.dia, monthrange(anio, mes)[1])
-        g = Gasto(
-            cantidad=r.cantidad,
-            categoria_id=r.categoria_id,
-            descripcion=r.nombre,
-            fuente="recurrente",
-            recurrente_id=r.id,
-            fecha=datetime(anio, mes, dia_real, 8, 0, 0, tzinfo=timezone.utc),
+        day_real = min(r.day, monthrange(year, month)[1])
+        e = Expense(
+            amount=r.amount,
+            category_id=r.category_id,
+            description=r.name,
+            source="recurring",
+            recurring_id=r.id,
+            date=datetime(year, month, day_real, 8, 0, 0, tzinfo=timezone.utc),
         )
-        session.add(g)
-        generados.append(r.nombre)
+        session.add(e)
+        generated.append({"name": r.name, "amount": r.amount})
 
     session.commit()
-    return {"generados": generados, "saltados": saltados, "total": len(generados)}
+    return {"generated": generated, "skipped": skipped, "total": len(generated)}

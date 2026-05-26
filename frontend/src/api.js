@@ -1,41 +1,40 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api/finanzas' })
-const memApi = axios.create({ baseURL: '/api/memoria' })
+const api = axios.create({ baseURL: '/api/finance' })
+const memApi = axios.create({ baseURL: '/api/memory' })
 
-export const getCategorias = (params = {}) => api.get('/categorias', { params }).then(r => r.data)
-export const createCategoria = (data) => api.post('/categorias', data).then(r => r.data)
-export const updateCategoria = (id, data) => api.patch(`/categorias/${id}`, data).then(r => r.data)
-export const deleteCategoria = (id) => api.delete(`/categorias/${id}`)
+export const getCategories = (params = {}) => api.get('/categories', { params }).then(r => r.data)
+export const createCategory = (data) => api.post('/categories', data).then(r => r.data)
+export const updateCategory = (id, data) => api.patch(`/categories/${id}`, data).then(r => r.data)
+export const deleteCategory = (id) => api.delete(`/categories/${id}`)
 
-export const getGastos = (params = {}) => {
-  const p = { ...params }
+export const getExpenses = (params = {}) => {
   // per_page cap raised on backend to 5000 for exports
-  return api.get('/gastos', { params: p }).then(r => r.data)
+  return api.get('/expenses', { params }).then(r => r.data)
 }
-export const createGasto = (data) => api.post('/gastos', data).then(r => r.data)
-export const updateGasto = (id, data) => api.patch(`/gastos/${id}`, data).then(r => r.data)
-export const deleteGasto = (id) => api.delete(`/gastos/${id}`)
+export const createExpense = (data) => api.post('/expenses', data).then(r => r.data)
+export const updateExpense = (id, data) => api.patch(`/expenses/${id}`, data).then(r => r.data)
+export const deleteExpense = (id) => api.delete(`/expenses/${id}`)
 
-export const getResumen = (params = {}) => api.get('/resumen', { params }).then(r => r.data)
-export const getEvolucion = (meses = 12) => api.get('/evolucion', { params: { meses } }).then(r => r.data)
-export const getMeses = () => api.get('/meses').then(r => r.data)
+export const getSummary = (params = {}) => api.get('/summary', { params }).then(r => r.data)
+export const getEvolution = (months = 12) => api.get('/evolution', { params: { months } }).then(r => r.data)
+export const getMonths = () => api.get('/months').then(r => r.data)
 
-export const importarPreview = (file) => {
+export const importPreview = (file) => {
   const fd = new FormData()
   fd.append('file', file)
-  return api.post('/importar/preview', fd).then(r => r.data)
+  return api.post('/import/preview', fd).then(r => r.data)
 }
-export const importarConfirmar = (rows) => api.post('/importar/confirmar', rows).then(r => r.data)
+export const importConfirm = (rows) => api.post('/import/confirm', rows).then(r => r.data)
 
-export const getMemorias = () => memApi.get('').then(r => r.data)
-export const createMemoria = (hecho) => memApi.post('', { hecho }).then(r => r.data)
-export const updateMemoria = (id, hecho) => memApi.patch(`/${id}`, { hecho }).then(r => r.data)
-export const deleteMemoria = (id) => memApi.delete(`/${id}`)
+export const getMemories = () => memApi.get('').then(r => r.data)
+export const createMemory = (fact) => memApi.post('', { fact }).then(r => r.data)
+export const updateMemory = (id, fact) => memApi.patch(`/${id}`, { fact }).then(r => r.data)
+export const deleteMemory = (id) => memApi.delete(`/${id}`)
 
-const recApi = axios.create({ baseURL: '/api/finanzas/recurrentes' })
-export const getRecurrentes = (params = {}) => recApi.get('', { params }).then(r => r.data)
-export const createRecurrente = (data) => recApi.post('', data).then(r => r.data)
-export const updateRecurrente = (id, data) => recApi.patch(`/${id}`, data).then(r => r.data)
-export const deleteRecurrente = (id) => recApi.delete(`/${id}`)
-export const generarRecurrentes = (params = {}) => recApi.post('/generar', null, { params }).then(r => r.data)
+const recApi = axios.create({ baseURL: '/api/finance/recurring' })
+export const getRecurring = (params = {}) => recApi.get('', { params }).then(r => r.data)
+export const createRecurring = (data) => recApi.post('', data).then(r => r.data)
+export const updateRecurring = (id, data) => recApi.patch(`/${id}`, data).then(r => r.data)
+export const deleteRecurring = (id) => recApi.delete(`/${id}`)
+export const generateRecurring = (params = {}) => recApi.post('/generate', null, { params }).then(r => r.data)

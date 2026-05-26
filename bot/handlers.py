@@ -5,51 +5,51 @@ from telegram.ext import ContextTypes
 from app.config import settings
 from app.database import get_session
 from app.services.llm import chat
-from app.modules.finanzas.models import Gasto, Categoria
-from app.modules.finanzas.parser import parsear_gasto
+from app.modules.finanzas.models import Expense, Category
+from app.modules.finanzas.parser import parse_expense
 from app.modules.finanzas.service import (
-    registrar_gasto, ultimos_gastos, total_mes_global,
-    resumen_mes, buscar_categoria, listar_categorias, get_gastos_filtrados,
-    generar_recurrentes,
+    register_expense, latest_expenses, month_total,
+    month_summary, find_category, list_categories, get_expenses_filtered,
+    generate_recurring,
 )
-from app.modules.memoria.service import guardar_memoria, listar_memorias, borrar_memoria, construir_contexto
+from app.modules.memoria.service import save_memory, list_memories, delete_memory, build_context
 
-MESES_ES = ["enero","febrero","marzo","abril","mayo","junio",
-            "julio","agosto","septiembre","octubre","noviembre","diciembre"]
+MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio",
+             "julio","agosto","septiembre","octubre","noviembre","diciembre"]
 
 
 def allowed(update: Update) -> bool:
     return update.effective_user.id in settings.allowed_user_ids
 
 
-def _barra(total: float, estimacion: float) -> str:
-    if estimacion <= 0:
+def _bar(total: float, estimate: float) -> str:
+    if estimate <= 0:
         return ""
-    pct = min(total / estimacion, 1.0)
+    pct = min(total / estimate, 1.0)
     filled = round(pct * 8)
     return f" `{'█' * filled}{'░' * (8 - filled)}`"
 
 
-def _construir_contexto_finanzas(session) -> str:
-    ahora = datetime.now(timezone.utc)
-    total = total_mes_global(session)
-    resumen = resumen_mes(session)
-    if not resumen and total == 0:
+def _build_finance_context(session) -> str:
+    now = datetime.now(timezone.utc)
+    total = month_total(session)
+    summary = month_summary(session)
+    if not summary and total == 0:
         return ""
-    mes_nombre = MESES_ES[ahora.month - 1]
-    lineas = [f"Gastos {mes_nombre} {ahora.year} (datos reales):"]
-    lineas.append(f"- Total: {total:.2f}€")
-    for r in sorted(resumen, key=lambda x: x["total"], reverse=True):
+    month_name = MONTHS_ES[now.month - 1]
+    lines = [f"Gastos {month_name} {now.year} (datos reales):"]
+    lines.append(f"- Total: {total:.2f}€")
+    for r in sorted(summary, key=lambda x: x["total"], reverse=True):
         if r["total"] > 0:
-            est = f"/{r['estimacion']:.0f}€" if r["estimacion"] > 0 else ""
-            alerta = " [SOBRE PRESUPUESTO]" if r["alerta"] else ""
-            lineas.append(f"- {r['nombre']}: {r['total']:.2f}€{est}{alerta}")
-    return "\n".join(lineas)
+            est = f"/{r['estimate']:.0f}€" if r["estimate"] > 0 else ""
+            alert = " [SOBRE PRESUPUESTO]" if r["alert"] else ""
+            lines.append(f"- {r['name']}: {r['total']:.2f}€{est}{alert}")
+    return "\n".join(lines)
 
 
-def _categoria_keyboard(session) -> InlineKeyboardMarkup:
-    cats = listar_categorias(session)[:8]
-    buttons = [InlineKeyboardButton(c.nombre, callback_data=f"cat:{c.id}") for c in cats]
+def _category_keyboard(session) -> InlineKeyboardMarkup:
+    cats = list_categories(session)[:8]
+    buttons = [InlineKeyboardButton(c.name, callback_data=f"cat:{c.id}") for c in cats]
     rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
     rows.append([InlineKeyboardButton("Sin categoría", callback_data="cat:0")])
     return InlineKeyboardMarkup(rows)
@@ -83,31 +83,31 @@ async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-    filtrar_mes = context.args and context.args[0].lower() in ("mes", "month")
+    filter_month = context.args and context.args[0].lower() in ("mes", "month")
 
-    if filtrar_mes:
-        ahora = datetime.now(timezone.utc)
-        gastos_raw, total_count = get_gastos_filtrados(
-            session, anio=ahora.year, mes=ahora.month,
-            page=1, per_page=15, orden="fecha", asc=False
+    if filter_month:
+        now = datetime.now(timezone.utc)
+        expenses_raw, total_count = get_expenses_filtered(
+            session, year=now.year, month=now.month,
+            page=1, per_page=15, order="date", asc=False
         )
     else:
-        gastos_raw = ultimos_gastos(session, 10)
-        total_count = len(gastos_raw)
+        expenses_raw = latest_expenses(session, 10)
+        total_count = len(expenses_raw)
 
-    if not gastos_raw:
+    if not expenses_raw:
         await update.message.reply_text("Sin gastos registrados.")
         return
 
-    lineas = []
-    for g, cat in gastos_raw:
-        cat_nombre = cat.nombre if cat else "—"
-        desc = f" {g.descripcion}" if g.descripcion else ""
-        fecha = g.fecha.strftime("%d/%m") if g.fecha else ""
-        lineas.append(f"`{g.id:4d}` {fecha}  *{g.cantidad:.2f}€*  {cat_nombre}{desc}")
+    lines = []
+    for e, cat in expenses_raw:
+        cat_name = cat.name if cat else "—"
+        desc = f" {e.description}" if e.description else ""
+        date = e.date.strftime("%d/%m") if e.date else ""
+        lines.append(f"`{e.id:4d}` {date}  *{e.amount:.2f}€*  {cat_name}{desc}")
 
-    header = f"Mes actual ({total_count} gastos):" if filtrar_mes else "Últimos gastos:"
-    await update.message.reply_text(header + "\n" + "\n".join(lineas), parse_mode="Markdown")
+    header = f"Mes actual ({total_count} gastos):" if filter_month else "Últimos gastos:"
+    await update.message.reply_text(header + "\n" + "\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -117,27 +117,27 @@ async def cmd_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Uso: /borrar <id>")
         return
     try:
-        gasto_id = int(context.args[0])
+        expense_id = int(context.args[0])
     except ValueError:
         await update.message.reply_text("ID debe ser un número.")
         return
 
     session = next(get_session())
-    gasto = session.get(Gasto, gasto_id)
-    if not gasto:
-        await update.message.reply_text(f"No existe el gasto #{gasto_id}.")
+    expense = session.get(Expense, expense_id)
+    if not expense:
+        await update.message.reply_text(f"No existe el gasto #{expense_id}.")
         return
 
-    cat = session.get(Categoria, gasto.categoria_id) if gasto.categoria_id else None
-    cat_nombre = cat.nombre if cat else "sin categoría"
-    desc = f" — {gasto.descripcion}" if gasto.descripcion else ""
+    cat = session.get(Category, expense.category_id) if expense.category_id else None
+    cat_name = cat.name if cat else "sin categoría"
+    desc = f" — {expense.description}" if expense.description else ""
 
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✓ Confirmar", callback_data=f"borrar:{gasto_id}"),
+        InlineKeyboardButton("✓ Confirmar", callback_data=f"borrar:{expense_id}"),
         InlineKeyboardButton("✕ Cancelar", callback_data="borrar:cancel"),
     ]])
     await update.message.reply_text(
-        f"Borrar gasto #{gasto_id}?\n`{gasto.cantidad:.2f}€`  {cat_nombre}{desc}",
+        f"Borrar gasto #{expense_id}?\n`{expense.amount:.2f}€`  {cat_name}{desc}",
         parse_mode="Markdown",
         reply_markup=keyboard,
     )
@@ -151,22 +151,22 @@ async def callback_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Cancelado.")
         return
 
-    gasto_id = int(query.data.split(":")[1])
+    expense_id = int(query.data.split(":")[1])
     session = next(get_session())
-    gasto = session.get(Gasto, gasto_id)
-    if not gasto:
+    expense = session.get(Expense, expense_id)
+    if not expense:
         await query.edit_message_text("No encontrado.")
         return
-    session.delete(gasto)
+    session.delete(expense)
     session.commit()
-    await query.edit_message_text(f"✓ Gasto #{gasto_id} eliminado.")
+    await query.edit_message_text(f"✓ Gasto #{expense_id} eliminado.")
 
 
 async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    pending = context.user_data.get("pending_gasto")
+    pending = context.user_data.get("pending_expense")
     if not pending:
         await query.edit_message_text("Sin gasto pendiente.")
         return
@@ -175,14 +175,14 @@ async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
     cat_id = int(cat_id_str) if cat_id_str != "0" else None
 
     session = next(get_session())
-    g = registrar_gasto(session, pending["cantidad"], cat_id, pending["descripcion"])
+    register_expense(session, pending["amount"], cat_id, pending["description"])
 
-    cat = session.get(Categoria, cat_id) if cat_id else None
-    cat_nombre = cat.nombre if cat else "sin categoría"
-    context.user_data.pop("pending_gasto", None)
+    cat = session.get(Category, cat_id) if cat_id else None
+    cat_name = cat.name if cat else "sin categoría"
+    context.user_data.pop("pending_expense", None)
 
     await query.edit_message_text(
-        f"✓ *{pending['descripcion']}* — {pending['cantidad']:.2f}€ ({cat_nombre})",
+        f"✓ *{pending['description']}* — {pending['amount']:.2f}€ ({cat_name})",
         parse_mode="Markdown"
     )
 
@@ -191,56 +191,56 @@ async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-    resumen = resumen_mes(session)
-    total = total_mes_global(session)
+    summary = month_summary(session)
+    total = month_total(session)
 
-    if not resumen:
+    if not summary:
         await update.message.reply_text("Sin categorías. Configúralas desde el dashboard.")
         return
 
-    variable = [r for r in resumen if r["tipo"] == "variable" and (r["total"] > 0 or r["estimacion"] > 0)]
-    fijo = [r for r in resumen if r["tipo"] == "fijo" and (r["total"] > 0 or r["estimacion"] > 0)]
+    variable = [r for r in summary if r["type"] == "variable" and (r["total"] > 0 or r["estimate"] > 0)]
+    fixed = [r for r in summary if r["type"] == "fixed" and (r["total"] > 0 or r["estimate"] > 0)]
 
-    lineas = []
-    for seccion, items in [("Variable", variable), ("Fijo", fijo)]:
+    lines = []
+    for section, items in [("Variable", variable), ("Fijo", fixed)]:
         if not items:
             continue
-        lineas.append(f"*{seccion}*")
+        lines.append(f"*{section}*")
         for r in items:
-            alerta = " ⚠" if r["alerta"] else ""
-            barra = _barra(r["total"], r["estimacion"])
-            est = f"/{r['estimacion']:.0f}€" if r["estimacion"] > 0 else ""
-            lineas.append(f"  {r['nombre']}: {r['total']:.0f}€{est}{alerta}{barra}")
+            alert = " ⚠" if r["alert"] else ""
+            bar = _bar(r["total"], r["estimate"])
+            est = f"/{r['estimate']:.0f}€" if r["estimate"] > 0 else ""
+            lines.append(f"  {r['name']}: {r['total']:.0f}€{est}{alert}{bar}")
 
-    lineas.append(f"\n*Total: {total:.2f}€*")
-    await update.message.reply_text("\n".join(lineas), parse_mode="Markdown")
+    lines.append(f"\n*Total: {total:.2f}€*")
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_categorias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-    cats = listar_categorias(session)
+    cats = list_categories(session)
     if not cats:
         await update.message.reply_text("Sin categorías.")
         return
-    variable = [c for c in cats if c.tipo == "variable"]
-    fijo = [c for c in cats if c.tipo == "fijo"]
-    lineas = ["*Variable*"] + [f"  {c.nombre}" + (f" — {c.estimacion_mensual:.0f}€/mes" if c.estimacion_mensual > 0 else "") for c in variable]
-    if fijo:
-        lineas += ["\n*Fijo*"] + [f"  {c.nombre}" + (f" — {c.estimacion_mensual:.0f}€/mes" if c.estimacion_mensual > 0 else "") for c in fijo]
-    await update.message.reply_text("\n".join(lineas), parse_mode="Markdown")
+    variable = [c for c in cats if c.type == "variable"]
+    fixed = [c for c in cats if c.type == "fixed"]
+    lines = ["*Variable*"] + [f"  {c.name}" + (f" — {c.monthly_estimate:.0f}€/mes" if c.monthly_estimate > 0 else "") for c in variable]
+    if fixed:
+        lines += ["\n*Fijo*"] + [f"  {c.name}" + (f" — {c.monthly_estimate:.0f}€/mes" if c.monthly_estimate > 0 else "") for c in fixed]
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_recuerda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    hecho = " ".join(context.args).strip()
-    if not hecho:
+    fact = " ".join(context.args).strip()
+    if not fact:
         await update.message.reply_text("Uso: /recuerda <hecho>")
         return
     session = next(get_session())
-    m = guardar_memoria(session, hecho)
+    m = save_memory(session, fact)
     await update.message.reply_text(f"✓ Guardado (#{m.id})")
 
 
@@ -248,12 +248,12 @@ async def cmd_memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-    memorias = listar_memorias(session)
-    if not memorias:
+    memories = list_memories(session)
+    if not memories:
         await update.message.reply_text("Sin memoria guardada.")
         return
-    lineas = [f"`{m.id}` {m.hecho}" for m in memorias]
-    await update.message.reply_text("*Memoria:*\n" + "\n".join(lineas), parse_mode="Markdown")
+    lines = [f"`{m.id}` {m.fact}" for m in memories]
+    await update.message.reply_text("*Memoria:*\n" + "\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -268,7 +268,7 @@ async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("ID debe ser un número.")
         return
     session = next(get_session())
-    ok = borrar_memoria(session, id_)
+    ok = delete_memory(session, id_)
     await update.message.reply_text("✓ Olvidado." if ok else "No encontrado.")
 
 
@@ -276,67 +276,67 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-    ahora = datetime.now(timezone.utc)
-    total = total_mes_global(session)
-    mes_ant = ahora.month - 1 or 12
-    anio_ant = ahora.year if ahora.month > 1 else ahora.year - 1
-    total_ant = total_mes_global(session, anio_ant, mes_ant)
-    resumen = resumen_mes(session)
-    alertas = [r for r in resumen if r["alerta"]]
-    activos = [r for r in resumen if r["total"] > 0]
-    top = max(activos, key=lambda r: r["total"]) if activos else None
+    now = datetime.now(timezone.utc)
+    total = month_total(session)
+    prev_month = now.month - 1 or 12
+    prev_year = now.year if now.month > 1 else now.year - 1
+    prev_total = month_total(session, prev_year, prev_month)
+    summary = month_summary(session)
+    alerts = [r for r in summary if r["alert"]]
+    active = [r for r in summary if r["total"] > 0]
+    top = max(active, key=lambda r: r["total"]) if active else None
 
-    mes_nombre = MESES_ES[ahora.month - 1].capitalize()
-    lineas = [f"*{mes_nombre} {ahora.year}*"]
+    month_name = MONTHS_ES[now.month - 1].capitalize()
+    lines = [f"*{month_name} {now.year}*"]
 
-    if total_ant > 0:
-        pct = ((total - total_ant) / total_ant) * 100
-        signo = "+" if pct >= 0 else ""
-        flecha = "▲" if pct > 5 else ("▼" if pct < -5 else "→")
-        lineas.append(f"Total: *{total:.2f}€*  {flecha} {signo}{pct:.0f}% vs {MESES_ES[mes_ant-1]}")
+    if prev_total > 0:
+        pct = ((total - prev_total) / prev_total) * 100
+        sign = "+" if pct >= 0 else ""
+        arrow = "▲" if pct > 5 else ("▼" if pct < -5 else "→")
+        lines.append(f"Total: *{total:.2f}€*  {arrow} {sign}{pct:.0f}% vs {MONTHS_ES[prev_month-1]}")
     else:
-        lineas.append(f"Total: *{total:.2f}€*")
+        lines.append(f"Total: *{total:.2f}€*")
 
     if top:
         pct_top = (top['total'] / total * 100) if total > 0 else 0
-        lineas.append(f"Top: {top['nombre']} — {top['total']:.0f}€ ({pct_top:.0f}%)")
+        lines.append(f"Top: {top['name']} — {top['total']:.0f}€ ({pct_top:.0f}%)")
 
-    if alertas:
-        cats = ", ".join(a["nombre"] for a in alertas)
-        lineas.append(f"⚠ Sobre presupuesto: {cats}")
+    if alerts:
+        cats = ", ".join(a["name"] for a in alerts)
+        lines.append(f"⚠ Sobre presupuesto: {cats}")
     else:
-        lineas.append("Todos los presupuestos OK")
+        lines.append("Todos los presupuestos OK")
 
-    await update.message.reply_text("\n".join(lineas), parse_mode="Markdown")
+    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    pregunta = " ".join(context.args).strip() if context.args else ""
-    if not pregunta:
-        pregunta = "Analiza mis gastos de este mes. ¿En qué destaco positiva o negativamente? ¿Algún consejo concreto?"
+    question = " ".join(context.args).strip() if context.args else ""
+    if not question:
+        question = "Analiza mis gastos de este mes. ¿En qué destaco positiva o negativamente? ¿Algún consejo concreto?"
     session = next(get_session())
-    contexto_memoria = construir_contexto(session)
-    contexto_finanzas = _construir_contexto_finanzas(session)
+    memory_context = build_context(session)
+    finance_context = _build_finance_context(session)
     await update.message.reply_chat_action("typing")
-    respuesta = await asyncio.to_thread(chat, pregunta, contexto_memoria, contexto_finanzas)
-    await update.message.reply_text(respuesta, parse_mode="Markdown")
+    response = await asyncio.to_thread(chat, question, memory_context, finance_context)
+    await update.message.reply_text(response, parse_mode="Markdown")
 
 
 async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     session = next(get_session())
-    ahora = datetime.now(timezone.utc)
-    result = generar_recurrentes(session, ahora.year, ahora.month)
+    now = datetime.now(timezone.utc)
+    result = generate_recurring(session, now.year, now.month)
     total = result["total"]
     if total == 0:
         await update.message.reply_text("Todos los recurrentes ya generados este mes.")
         return
-    lineas = [f"✓ {g['nombre']} — {g['cantidad']:.2f}€" for g in result["generados"]]
+    lines = [f"✓ {g['name']} — {g['amount']:.2f}€" for g in result["generated"]]
     await update.message.reply_text(
-        f"*{total} gasto{'s' if total > 1 else ''} generado{'s' if total > 1 else ''}:*\n" + "\n".join(lineas),
+        f"*{total} gasto{'s' if total > 1 else ''} generado{'s' if total > 1 else ''}:*\n" + "\n".join(lines),
         parse_mode="Markdown"
     )
 
@@ -344,29 +344,28 @@ async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    texto = update.message.text
+    text = update.message.text
 
-    gasto = parsear_gasto(texto)
-    if gasto:
+    parsed = parse_expense(text)
+    if parsed:
         session = next(get_session())
-        cat = buscar_categoria(session, gasto.categoria_hint) if gasto.categoria_hint else None
+        cat = find_category(session, parsed.category_hint) if parsed.category_hint else None
 
         if cat:
-            registrar_gasto(session, gasto.cantidad, cat.id, gasto.descripcion)
+            register_expense(session, parsed.amount, cat.id, parsed.description)
             await update.message.reply_text(
-                f"✓ *{gasto.descripcion}* — {gasto.cantidad:.2f}€ ({cat.nombre})",
+                f"✓ *{parsed.description}* — {parsed.amount:.2f}€ ({cat.name})",
                 parse_mode="Markdown"
             )
         else:
-            # No category matched — ask with inline keyboard
-            context.user_data["pending_gasto"] = {
-                "descripcion": gasto.descripcion,
-                "cantidad": gasto.cantidad,
+            context.user_data["pending_expense"] = {
+                "description": parsed.description,
+                "amount": parsed.amount,
             }
             await update.message.reply_text(
-                f"*{gasto.descripcion}* — {gasto.cantidad:.2f}€\n¿Categoría?",
+                f"*{parsed.description}* — {parsed.amount:.2f}€\n¿Categoría?",
                 parse_mode="Markdown",
-                reply_markup=_categoria_keyboard(session),
+                reply_markup=_category_keyboard(session),
             )
         return
 

@@ -2,34 +2,34 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session
 from app.database import get_session
-from app.modules.memoria.service import guardar_memoria, listar_memorias, borrar_memoria, actualizar_memoria
+from app.modules.memoria.service import save_memory, list_memories, delete_memory, update_memory
 
-router = APIRouter(prefix="/api/memoria", tags=["memoria"])
+router = APIRouter(prefix="/api/memory", tags=["memory"])
 
 
-class MemoriaCreate(BaseModel):
-    hecho: str
+class MemoryCreate(BaseModel):
+    fact: str
 
 
 @router.get("")
-def get_memorias(session: Session = Depends(get_session)):
-    return listar_memorias(session)
+def get_memories(session: Session = Depends(get_session)):
+    return list_memories(session)
 
 
 @router.post("", status_code=201)
-def post_memoria(body: MemoriaCreate, session: Session = Depends(get_session)):
-    return guardar_memoria(session, body.hecho)
+def post_memory(body: MemoryCreate, session: Session = Depends(get_session)):
+    return save_memory(session, body.fact)
 
 
 @router.patch("/{id}")
-def patch_memoria(id: int, body: MemoriaCreate, session: Session = Depends(get_session)):
-    m = actualizar_memoria(session, id, body.hecho)
+def patch_memory(id: int, body: MemoryCreate, session: Session = Depends(get_session)):
+    m = update_memory(session, id, body.fact)
     if not m:
         raise HTTPException(404)
     return m
 
 
 @router.delete("/{id}", status_code=204)
-def delete_memoria(id: int, session: Session = Depends(get_session)):
-    if not borrar_memoria(session, id):
+def delete_memory_route(id: int, session: Session = Depends(get_session)):
+    if not delete_memory(session, id):
         raise HTTPException(404)

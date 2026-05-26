@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getCategorias, createCategoria, updateCategoria, deleteCategoria, getResumen } from '../api'
+import { getCategories, createCategory, updateCategory, deleteCategory, getSummary } from '../api'
 import { useToast } from './Toast'
 
 const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '8px 12px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
@@ -11,88 +11,88 @@ const btnDangerStyle = { background: 'transparent', border: 'none', color: 'var(
 export default function Categorias() {
   const toast = useToast()
   const qc = useQueryClient()
-  const [showInactivas, setShowInactivas] = useState(false)
+  const [showInactive, setShowInactive] = useState(false)
 
-  const { data: categorias = [], isLoading } = useQuery({
-    queryKey: ['categorias', 'all'],
-    queryFn: () => getCategorias({ solo_activas: false }),
+  const { data: categories = [], isLoading } = useQuery({
+    queryKey: ['categories', 'all'],
+    queryFn: () => getCategories({ active_only: false }),
   })
-  const { data: resumen } = useQuery({
-    queryKey: ['resumen'],
-    queryFn: () => getResumen(),
+  const { data: summary } = useQuery({
+    queryKey: ['summary'],
+    queryFn: () => getSummary(),
     refetchInterval: 30000,
   })
 
-  const [form, setForm] = useState({ nombre: '', tipo: 'variable', estimacion_mensual: '' })
+  const [form, setForm] = useState({ name: '', type: 'variable', monthly_estimate: '' })
   const [editId, setEditId] = useState(null)
   const [editVal, setEditVal] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
 
-  const resumenMap = Object.fromEntries((resumen?.categorias || []).map(r => [r.id, r]))
+  const summaryMap = Object.fromEntries((summary?.categories || []).map(r => [r.id, r]))
 
   const createMut = useMutation({
-    mutationFn: createCategoria,
+    mutationFn: createCategory,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categorias'] })
-      setForm({ nombre: '', tipo: 'variable', estimacion_mensual: '' })
-      toast('Categoría creada')
+      qc.invalidateQueries({ queryKey: ['categories'] })
+      setForm({ name: '', type: 'variable', monthly_estimate: '' })
+      toast('Category created')
     },
-    onError: (e) => toast(e?.response?.data?.detail || 'Error al crear categoría', 'error'),
+    onError: (e) => toast(e?.response?.data?.detail || 'Error creating category', 'error'),
   })
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }) => updateCategoria(id, data),
+    mutationFn: ({ id, data }) => updateCategory(id, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categorias'] })
-      qc.invalidateQueries({ queryKey: ['resumen'] })
+      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.invalidateQueries({ queryKey: ['summary'] })
       setEditId(null)
-      toast('Actualizado')
+      toast('Updated')
     },
-    onError: () => toast('Error al actualizar', 'error'),
+    onError: () => toast('Error updating', 'error'),
   })
 
   const deleteMut = useMutation({
-    mutationFn: deleteCategoria,
+    mutationFn: deleteCategory,
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['categorias'] })
-      qc.invalidateQueries({ queryKey: ['resumen'] })
+      qc.invalidateQueries({ queryKey: ['categories'] })
+      qc.invalidateQueries({ queryKey: ['summary'] })
       setConfirmDelete(null)
-      toast('Categoría eliminada')
+      toast('Category deleted')
     },
-    onError: () => toast('Error al eliminar', 'error'),
+    onError: () => toast('Error deleting', 'error'),
   })
 
   const submit = (e) => {
     e.preventDefault()
-    createMut.mutate({ ...form, estimacion_mensual: parseFloat(form.estimacion_mensual) || 0 })
+    createMut.mutate({ ...form, monthly_estimate: parseFloat(form.monthly_estimate) || 0 })
   }
 
-  const activas = categorias.filter(c => c.activa)
-  const inactivas = categorias.filter(c => !c.activa)
-  const variable = activas.filter(c => c.tipo === 'variable')
-  const fijo = activas.filter(c => c.tipo === 'fijo')
+  const active = categories.filter(c => c.active)
+  const inactive = categories.filter(c => !c.active)
+  const variable = active.filter(c => c.type === 'variable')
+  const fixed = active.filter(c => c.type === 'fixed')
 
   const CatRow = ({ c }) => {
-    const mes = resumenMap[c.id]
-    const alerta = mes?.alerta
+    const mes = summaryMap[c.id]
+    const alert = mes?.alert
     return (
       <div
         style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0',
           borderBottom: '1px solid var(--border-dim)',
-          opacity: c.activa ? 1 : 0.55, flexWrap: 'wrap',
+          opacity: c.active ? 1 : 0.55, flexWrap: 'wrap',
         }}
-        onMouseEnter={e => e.currentTarget.style.opacity = c.activa ? '0.8' : '0.45'}
-        onMouseLeave={e => e.currentTarget.style.opacity = c.activa ? '1' : '0.55'}
+        onMouseEnter={e => e.currentTarget.style.opacity = c.active ? '0.8' : '0.45'}
+        onMouseLeave={e => e.currentTarget.style.opacity = c.active ? '1' : '0.55'}
       >
-        <span style={{ flex: 1, fontSize: 14, color: alerta ? 'var(--red)' : (c.activa ? 'var(--text)' : 'var(--text-dim)'), minWidth: 100 }}>
-          {c.nombre}
+        <span style={{ flex: 1, fontSize: 14, color: alert ? 'var(--red)' : (c.active ? 'var(--text)' : 'var(--text-dim)'), minWidth: 100 }}>
+          {c.name}
         </span>
-        {mes && c.activa && (
-          <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: alerta ? 'var(--red)' : 'var(--text-dim)' }}>
+        {mes && c.active && (
+          <span style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums', color: alert ? 'var(--red)' : 'var(--text-dim)' }}>
             <span style={{ fontWeight: 600 }}>{mes.total.toFixed(2)}€</span>
-            {c.estimacion_mensual > 0 && (
-              <span style={{ color: 'var(--text-muted)' }}> / {c.estimacion_mensual.toFixed(0)}€</span>
+            {c.monthly_estimate > 0 && (
+              <span style={{ color: 'var(--text-muted)' }}> / {c.monthly_estimate.toFixed(0)}€</span>
             )}
           </span>
         )}
@@ -100,24 +100,24 @@ export default function Categorias() {
           <>
             <input type="number" step="0.01" value={editVal} onChange={e => setEditVal(e.target.value)}
               style={{ ...inputStyle, width: 90, fontSize: 13, padding: '4px 8px' }} autoFocus
-              onKeyDown={e => { if (e.key === 'Enter') updateMut.mutate({ id: c.id, data: { estimacion_mensual: parseFloat(editVal) } }) }}
+              onKeyDown={e => { if (e.key === 'Enter') updateMut.mutate({ id: c.id, data: { monthly_estimate: parseFloat(editVal) } }) }}
             />
-            <button onClick={() => updateMut.mutate({ id: c.id, data: { estimacion_mensual: parseFloat(editVal) } })} style={{ ...btnStyle, padding: '4px 10px', fontSize: 13 }}>✓</button>
+            <button onClick={() => updateMut.mutate({ id: c.id, data: { monthly_estimate: parseFloat(editVal) } })} style={{ ...btnStyle, padding: '4px 10px', fontSize: 13 }}>✓</button>
             <button onClick={() => setEditId(null)} style={{ ...btnSecStyle, padding: '4px 8px', fontSize: 13 }}>✕</button>
           </>
         ) : (
           <>
             <button
-              onClick={() => { setEditId(c.id); setEditVal(c.estimacion_mensual) }}
+              onClick={() => { setEditId(c.id); setEditVal(c.monthly_estimate) }}
               style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', lineHeight: 1 }}
-              title="Editar presupuesto"
+              title="Edit budget"
             >✎</button>
             <button
-              onClick={() => updateMut.mutate({ id: c.id, data: { activa: !c.activa } })}
-              style={{ background: 'none', border: 'none', color: c.activa ? 'var(--text-dim)' : 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '2px 6px', letterSpacing: 0.3 }}
-              title={c.activa ? 'Desactivar' : 'Activar'}
+              onClick={() => updateMut.mutate({ id: c.id, data: { active: !c.active } })}
+              style={{ background: 'none', border: 'none', color: c.active ? 'var(--text-dim)' : 'var(--accent)', cursor: 'pointer', fontSize: 11, padding: '2px 6px', letterSpacing: 0.3 }}
+              title={c.active ? 'Deactivate' : 'Activate'}
             >
-              {c.activa ? '···' : 'activar'}
+              {c.active ? '···' : 'activate'}
             </button>
             {confirmDelete === c.id ? (
               <>
@@ -125,7 +125,7 @@ export default function Categorias() {
                 <button onClick={() => setConfirmDelete(null)} style={btnDangerStyle}>✕</button>
               </>
             ) : (
-              <button onClick={() => setConfirmDelete(c.id)} style={btnDangerStyle} title="Eliminar">✕</button>
+              <button onClick={() => setConfirmDelete(c.id)} style={btnDangerStyle} title="Delete">✕</button>
             )}
           </>
         )}
@@ -136,37 +136,37 @@ export default function Categorias() {
   return (
     <div>
       <form onSubmit={submit} style={{ display: 'flex', gap: 8, marginBottom: 28, flexWrap: 'wrap' }}>
-        <input placeholder="Nombre" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} style={inputStyle} required />
-        <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))} style={inputStyle}>
+        <input placeholder="Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} required />
+        <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={inputStyle}>
           <option value="variable">Variable</option>
-          <option value="fijo">Fijo</option>
+          <option value="fixed">Fixed</option>
         </select>
-        <input type="number" step="0.01" placeholder="Presupuesto €/mes" value={form.estimacion_mensual}
-          onChange={e => setForm(f => ({ ...f, estimacion_mensual: e.target.value }))} style={inputStyle} />
-        <button type="submit" style={btnStyle}>+ Añadir</button>
+        <input type="number" step="0.01" placeholder="Budget €/mo" value={form.monthly_estimate}
+          onChange={e => setForm(f => ({ ...f, monthly_estimate: e.target.value }))} style={inputStyle} />
+        <button type="submit" style={btnStyle}>+ Add</button>
       </form>
 
-      {isLoading ? <p style={{ color: 'var(--text-dim)' }}>Cargando...</p> : (
+      {isLoading ? <p style={{ color: 'var(--text-dim)' }}>Loading...</p> : (
         <>
-          {[['Variable', variable], ['Fijo', fijo]].map(([label, cats]) => (
+          {[['Variable', variable], ['Fixed', fixed]].map(([label, cats]) => (
             <div key={label} style={{ marginBottom: 24 }}>
               <h3 style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1.2, margin: '0 0 10px' }}>{label}</h3>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {cats.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Sin categorías</p>}
+                {cats.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No categories</p>}
                 {cats.map(c => <CatRow key={c.id} c={c} />)}
               </div>
             </div>
           ))}
 
-          {inactivas.length > 0 && (
+          {inactive.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <button onClick={() => setShowInactivas(s => !s)}
+              <button onClick={() => setShowInactive(s => !s)}
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13, padding: 0 }}>
-                {showInactivas ? '▾' : '▸'} Inactivas ({inactivas.length})
+                {showInactive ? '▾' : '▸'} Inactive ({inactive.length})
               </button>
-              {showInactivas && (
+              {showInactive && (
                 <div style={{ display: 'flex', flexDirection: 'column', marginTop: 10 }}>
-                  {inactivas.map(c => <CatRow key={c.id} c={c} />)}
+                  {inactive.map(c => <CatRow key={c.id} c={c} />)}
                 </div>
               )}
             </div>

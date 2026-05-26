@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import xlrd
 from sqlmodel import Session
-from app.modules.finanzas.service import listar_categorias
+from app.modules.finanzas.service import list_categories
 
 SKIP_CATEGORIES = {
     "Movimientos excluidos",
@@ -26,21 +26,19 @@ def _excel_serial_to_datetime(serial: float) -> datetime:
     return datetime(tup[0], tup[1], tup[2], tzinfo=timezone.utc)
 
 
-def _guess_categoria_id(session: Session, ing_cat: str, descripcion: str) -> int | None:
-    cats = listar_categorias(session)
-    desc_lower = descripcion.lower()
+def _guess_category_id(session: Session, ing_cat: str, description: str) -> int | None:
+    cats = list_categories(session)
+    desc_lower = description.lower()
 
-    # Direct name match in description
     for cat in cats:
-        if cat.nombre.lower() in desc_lower:
+        if cat.name.lower() in desc_lower:
             return cat.id
 
-    # ING category keyword hints
     keywords = ING_CAT_MAP.get(ing_cat, [])
     for kw in keywords:
         if kw in desc_lower:
             for cat in cats:
-                cat_lower = cat.nombre.lower()
+                cat_lower = cat.name.lower()
                 if any(k in cat_lower for k in ["alimenta", "mercado", "super"]) and ing_cat == "Alimentación":
                     return cat.id
                 if any(k in cat_lower for k in ["salud", "farmacia", "médico", "medico"]) and ing_cat == "Educación y salud":
@@ -62,26 +60,26 @@ def parse_ing_xls(file_bytes: bytes, session: Session) -> list[dict]:
     result = []
     for i in range(4, ws.nrows):
         ing_cat = ws.cell_value(i, 1)
-        descripcion = str(ws.cell_value(i, 3)).strip()
-        importe = ws.cell_value(i, 5)
-        fecha_serial = ws.cell_value(i, 0)
+        description = str(ws.cell_value(i, 3)).strip()
+        amount = ws.cell_value(i, 5)
+        date_serial = ws.cell_value(i, 0)
 
-        if not isinstance(fecha_serial, float) or fecha_serial == 0:
+        if not isinstance(date_serial, float) or date_serial == 0:
             continue
-        if importe >= 0:
+        if amount >= 0:
             continue
         if ing_cat in SKIP_CATEGORIES:
             continue
 
-        fecha = _excel_serial_to_datetime(fecha_serial)
-        categoria_id = _guess_categoria_id(session, ing_cat, descripcion)
+        date = _excel_serial_to_datetime(date_serial)
+        category_id = _guess_category_id(session, ing_cat, description)
 
         result.append({
-            "fecha": fecha.isoformat(),
-            "descripcion": descripcion,
-            "cantidad": round(abs(importe), 2),
-            "categoria_id": categoria_id,
-            "ing_categoria": ing_cat,
+            "date": date.isoformat(),
+            "description": description,
+            "amount": round(abs(amount), 2),
+            "category_id": category_id,
+            "ing_category": ing_cat,
         })
 
     return result

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMemorias, createMemoria, updateMemoria, deleteMemoria } from '../api'
+import { getMemories, createMemory, updateMemory, deleteMemory } from '../api'
 import { useToast } from './Toast'
 
 const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', fontSize: 14 }
@@ -8,39 +8,39 @@ const inputStyle = { background: 'var(--surface2)', border: '1px solid var(--bor
 export default function Memoria() {
   const toast = useToast()
   const qc = useQueryClient()
-  const [texto, setTexto] = useState('')
+  const [text, setText] = useState('')
   const [editId, setEditId] = useState(null)
-  const [editTexto, setEditTexto] = useState('')
+  const [editText, setEditText] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(null)
 
-  const { data: memorias = [], isLoading } = useQuery({ queryKey: ['memorias'], queryFn: getMemorias })
+  const { data: memories = [], isLoading } = useQuery({ queryKey: ['memories'], queryFn: getMemories })
 
   const createMut = useMutation({
-    mutationFn: createMemoria,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['memorias'] }); setTexto(''); toast('Guardado') },
-    onError: () => toast('Error al guardar', 'error'),
+    mutationFn: createMemory,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['memories'] }); setText(''); toast('Saved') },
+    onError: () => toast('Error saving', 'error'),
   })
 
   const updateMut = useMutation({
-    mutationFn: ({ id, hecho }) => updateMemoria(id, hecho),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['memorias'] }); setEditId(null); toast('Actualizado') },
-    onError: () => toast('Error al actualizar', 'error'),
+    mutationFn: ({ id, fact }) => updateMemory(id, fact),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['memories'] }); setEditId(null); toast('Updated') },
+    onError: () => toast('Error updating', 'error'),
   })
 
   const deleteMut = useMutation({
-    mutationFn: deleteMemoria,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['memorias'] }); setConfirmDelete(null); toast('Olvidado') },
-    onError: () => toast('Error al borrar', 'error'),
+    mutationFn: deleteMemory,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['memories'] }); setConfirmDelete(null); toast('Forgotten') },
+    onError: () => toast('Error deleting', 'error'),
   })
 
   const submit = (e) => {
     e.preventDefault()
-    if (!texto.trim()) return
-    createMut.mutate(texto.trim())
+    if (!text.trim()) return
+    createMut.mutate(text.trim())
   }
 
-  const startEdit = (m) => { setEditId(m.id); setEditTexto(m.hecho); setConfirmDelete(null) }
-  const saveEdit = () => { if (editTexto.trim()) updateMut.mutate({ id: editId, hecho: editTexto.trim() }) }
+  const startEdit = (m) => { setEditId(m.id); setEditText(m.fact); setConfirmDelete(null) }
+  const saveEdit = () => { if (editText.trim()) updateMut.mutate({ id: editId, fact: editText.trim() }) }
 
   return (
     <div>
@@ -48,23 +48,23 @@ export default function Memoria() {
       <form onSubmit={submit} style={{ display: 'flex', gap: 8, marginBottom: 28 }}>
         <input
           type="text"
-          placeholder="Añadir hecho..."
-          value={texto}
-          onChange={e => setTexto(e.target.value)}
+          placeholder="Add fact..."
+          value={text}
+          onChange={e => setText(e.target.value)}
           style={{ ...inputStyle, flex: 1 }}
         />
-        <button type="submit" disabled={createMut.isPending || !texto.trim()}
+        <button type="submit" disabled={createMut.isPending || !text.trim()}
           style={{ background: 'var(--accent)', border: 'none', color: 'var(--bg)', padding: '10px 18px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}>
-          + Guardar
+          + Save
         </button>
       </form>
 
-      {isLoading ? <p style={{ color: 'var(--text-dim)' }}>Cargando...</p> : (
-        memorias.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Sin memoria guardada.</p>
+      {isLoading ? <p style={{ color: 'var(--text-dim)' }}>Loading...</p> : (
+        memories.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>No memories saved.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {memorias.map(m => (
+            {memories.map(m => (
               <div key={m.id}
                 style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '11px 0', borderBottom: '1px solid var(--border-dim)' }}
                 onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
@@ -73,8 +73,8 @@ export default function Memoria() {
                 {editId === m.id ? (
                   <div style={{ flex: 1, display: 'flex', gap: 6, alignItems: 'flex-start' }}>
                     <textarea
-                      value={editTexto}
-                      onChange={e => setEditTexto(e.target.value)}
+                      value={editText}
+                      onChange={e => setEditText(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit() } if (e.key === 'Escape') setEditId(null) }}
                       style={{ ...inputStyle, flex: 1, resize: 'vertical', minHeight: 60, lineHeight: 1.5 }}
                       autoFocus
@@ -91,10 +91,10 @@ export default function Memoria() {
                     <span
                       style={{ flex: 1, fontSize: 14, color: 'var(--text)', lineHeight: 1.5, cursor: 'pointer' }}
                       onClick={() => startEdit(m)}
-                      title="Click para editar"
-                    >{m.hecho}</span>
+                      title="Click to edit"
+                    >{m.fact}</span>
                     <span style={{ color: 'var(--text-muted)', fontSize: 11, whiteSpace: 'nowrap', marginTop: 3 }}>
-                      {new Date(m.fecha).toLocaleDateString('es-ES')}
+                      {new Date(m.date).toLocaleDateString('en-GB')}
                     </span>
                     {confirmDelete === m.id ? (
                       <span style={{ display: 'flex', gap: 4 }}>

@@ -1,42 +1,42 @@
 from sqlmodel import Session, select
-from app.modules.memoria.models import Memoria
+from app.modules.memoria.models import Memory
 
 
-def guardar_memoria(session: Session, hecho: str) -> Memoria:
-    memoria = Memoria(hecho=hecho)
-    session.add(memoria)
+def save_memory(session: Session, fact: str) -> Memory:
+    memory = Memory(fact=fact)
+    session.add(memory)
     session.commit()
-    session.refresh(memoria)
-    return memoria
+    session.refresh(memory)
+    return memory
 
 
-def listar_memorias(session: Session) -> list[Memoria]:
-    return list(session.exec(select(Memoria).order_by(Memoria.fecha)).all())
+def list_memories(session: Session) -> list[Memory]:
+    return list(session.exec(select(Memory).order_by(Memory.date)).all())
 
 
-def actualizar_memoria(session: Session, id: int, hecho: str):
-    memoria = session.get(Memoria, id)
-    if not memoria:
+def update_memory(session: Session, id: int, fact: str):
+    memory = session.get(Memory, id)
+    if not memory:
         return None
-    memoria.hecho = hecho
-    session.add(memoria)
+    memory.fact = fact
+    session.add(memory)
     session.commit()
-    session.refresh(memoria)
-    return memoria
+    session.refresh(memory)
+    return memory
 
 
-def borrar_memoria(session: Session, id: int) -> bool:
-    memoria = session.get(Memoria, id)
-    if not memoria:
+def delete_memory(session: Session, id: int) -> bool:
+    memory = session.get(Memory, id)
+    if not memory:
         return False
-    session.delete(memoria)
+    session.delete(memory)
     session.commit()
     return True
 
 
-def construir_contexto(session: Session) -> str:
-    memorias = listar_memorias(session)
-    if not memorias:
+def build_context(session: Session) -> str:
+    memories = list_memories(session)
+    if not memories:
         return ""
-    hechos = "\n".join(f"- {m.hecho}" for m in memorias)
-    return f"Lo que sabes del usuario:\n{hechos}"
+    facts = "\n".join(f"- {m.fact}" for m in memories)
+    return f"Lo que sabes del usuario:\n{facts}"

@@ -28,13 +28,14 @@ app/
 bot/
   handlers.py    # handlers de Telegram
   run.py         # arranque del bot (llama a create_db al inicio)
-frontend/        # React + Vite, proxy /api → localhost:8000
+frontend/        # React + Vite, proxy /api → localhost:8001
 scripts/         # scripts de migración y seed (uso puntual, no producción)
 ```
 
 ## Convenciones
-- Nombres en español (dominio del negocio), código en inglés solo si es técnico puro
-- Nuevos módulos siempre en `app/modules/<modulo>/` con models + service
+- Código en inglés: modelos, servicios, routers, frontend, API keys, labels UI
+- Bot Telegram: respuestas en español (Sure habla español con el bot)
+- Nuevos módulos siempre en `app/modules/<module>/` con models + service
 - Registrar modelo nuevo en `app/models.py` para que create_db() lo cree
 - `get_session()` con `next()` en handlers — no usar como context manager en sync code
 - Variables de entorno: siempre en `.env`, nunca hardcodeadas, documentar en `.env.example`
@@ -59,12 +60,14 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Frontend consume API en /api (proxy Vite → FastAPI). En prod, mismo origen
 
 ## Estado actual del módulo Finanzas
-- Modelos: `Categoria` (nombre, tipo, estimacion_mensual, activa) + `Gasto` (categoria_id FK, cantidad, descripcion, fecha, fuente)
-- `Categoria.activa`: borrado suave — inactivas no aparecen en UI pero gastos históricos conservan FK
-- Categorías inactivas existentes: Anillo, Ahorros (datos históricos de Coda)
-- 482 gastos históricos importados desde Coda (junio 2025 → marzo 2026)
-- Parser de Telegram detecta patrón "descripcion cantidad" o "cantidad descripcion" e infiere categoría por keywords
-- Faltas de categoría en import: multas → Varios, farmacia/dentista → Salud
+- Modelos: `Category` (name, type, monthly_estimate, active) + `Expense` (category_id FK, amount, description, date, source) + `RecurringExpense` (name, amount, category_id, day, active)
+- `Category.active`: soft delete — inactive categories hidden in UI but historical expenses keep FK
+- Inactive categories: Anillo, Ahorros (historical data from Coda)
+- 482 historical expenses imported from Coda (June 2025 → March 2026)
+- Telegram parser detects "description amount" or "amount description" pattern, infers category by keywords
+- Import source values: `telegram`, `manual`, `import`, `recurring`
+- API prefix: `/api/finance` (categories, expenses, summary, evolution, months, import)
+- Ports: backend 8001, frontend 5174
 
 ## Módulos pendientes (por orden de prioridad acordado)
 1. Mejoras dashboard finanzas (en curso)

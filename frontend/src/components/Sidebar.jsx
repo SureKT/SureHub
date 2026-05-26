@@ -3,28 +3,27 @@ import LogoMark from './LogoMark'
 
 const MODULES = [
   {
-    id: 'finanzas',
-    label: 'Finanzas',
+    id: 'finance',
+    label: 'Finance',
     icon: BarChart2,
     active: true,
     items: [
-      { id: 'resumen', label: 'Resumen' },
-      { id: 'gastos', label: 'Gastos' },
-      { id: 'categorias', label: 'Categorías' },
-      { id: 'recurrentes', label: 'Recurrentes' },
-      { id: 'memoria', label: 'Memoria' },
+      { id: 'summary', label: 'Summary' },
+      { id: 'expenses', label: 'Expenses' },
+      { id: 'categories', label: 'Categories' },
+      { id: 'recurring', label: 'Recurring' },
     ],
   },
   {
-    id: 'automatizaciones',
-    label: 'Automatizaciones',
+    id: 'automations',
+    label: 'Automations',
     icon: Zap,
     active: false,
     items: [],
   },
   {
-    id: 'herramientas',
-    label: 'Herramientas',
+    id: 'tools',
+    label: 'Tools',
     icon: Wrench,
     active: false,
     items: [],
@@ -140,6 +139,35 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
         ))}
       </nav>
 
+      {/* Memory — global, footer */}
+      {!collapsed && (
+        <div style={{ borderTop: '1px solid var(--border-dim)', padding: '8px 0' }}>
+          <button
+            onClick={() => onNavigate('memory')}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              background: activeView === 'memory' ? 'var(--surface2)' : 'none',
+              border: 'none',
+              borderLeft: activeView === 'memory' ? '2px solid var(--accent)' : '2px solid transparent',
+              borderRadius: 0,
+              color: activeView === 'memory' ? 'var(--text)' : 'var(--text-dim)',
+              padding: '7px 16px',
+              fontSize: 13,
+              cursor: 'pointer',
+              fontWeight: activeView === 'memory' ? 500 : 400,
+              whiteSpace: 'nowrap',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { if (activeView !== 'memory') e.currentTarget.style.background = 'var(--surface3)' }}
+            onMouseLeave={e => { if (activeView !== 'memory') e.currentTarget.style.background = 'none' }}
+          >
+            Memory
+          </button>
+        </div>
+      )}
+
       {/* Collapse toggle */}
       <div style={{
         padding: '12px',
@@ -150,7 +178,7 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
       }}>
         <button
           onClick={onToggleCollapse}
-          title={collapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           style={{
             background: 'none',
             border: 'none',

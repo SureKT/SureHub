@@ -3,230 +3,230 @@ from pydantic import BaseModel
 from sqlmodel import Session
 from app.database import get_session
 from app.modules.finanzas.service import (
-    crear_categoria, listar_categorias, buscar_categoria,
-    registrar_gasto, get_gastos_filtrados, resumen_mes, total_mes_global,
-    evolucion_mensual, meses_disponibles
+    create_category, list_categories, find_category,
+    register_expense, get_expenses_filtered, month_summary, month_total,
+    monthly_evolution, available_months
 )
 
-router = APIRouter(prefix="/api/finanzas", tags=["finanzas"])
+router = APIRouter(prefix="/api/finance", tags=["finance"])
 
 
-class CategoriaCreate(BaseModel):
-    nombre: str
-    tipo: str
-    estimacion_mensual: float = 0.0
+class CategoryCreate(BaseModel):
+    name: str
+    type: str
+    monthly_estimate: float = 0.0
 
 
-class CategoriaUpdate(BaseModel):
-    estimacion_mensual: float | None = None
-    activa: bool | None = None
+class CategoryUpdate(BaseModel):
+    monthly_estimate: float | None = None
+    active: bool | None = None
 
 
-class GastoCreate(BaseModel):
-    categoria_id: int | None = None
-    cantidad: float
-    descripcion: str | None = None
-    fecha: str | None = None  # ISO date string opcional
+class ExpenseCreate(BaseModel):
+    category_id: int | None = None
+    amount: float
+    description: str | None = None
+    date: str | None = None
 
 
-class GastoUpdate(BaseModel):
-    categoria_id: int | None = None
-    cantidad: float | None = None
-    descripcion: str | None = None
-    fecha: str | None = None
+class ExpenseUpdate(BaseModel):
+    category_id: int | None = None
+    amount: float | None = None
+    description: str | None = None
+    date: str | None = None
 
 
-@router.get("/categorias")
-def get_categorias(solo_activas: bool = Query(True), session: Session = Depends(get_session)):
-    return listar_categorias(session, solo_activas=solo_activas)
+@router.get("/categories")
+def get_categories(active_only: bool = Query(True), session: Session = Depends(get_session)):
+    return list_categories(session, active_only=active_only)
 
 
-@router.post("/categorias", status_code=201)
-def post_categoria(body: CategoriaCreate, session: Session = Depends(get_session)):
-    if buscar_categoria(session, body.nombre):
-        raise HTTPException(400, "Categoría ya existe")
-    return crear_categoria(session, body.nombre, body.tipo, body.estimacion_mensual)
+@router.post("/categories", status_code=201)
+def post_category(body: CategoryCreate, session: Session = Depends(get_session)):
+    if find_category(session, body.name):
+        raise HTTPException(400, "Category already exists")
+    return create_category(session, body.name, body.type, body.monthly_estimate)
 
 
-@router.patch("/categorias/{id}")
-def patch_categoria(id: int, body: CategoriaUpdate, session: Session = Depends(get_session)):
-    from app.modules.finanzas.models import Categoria
-    cat = session.get(Categoria, id)
+@router.patch("/categories/{id}")
+def patch_category(id: int, body: CategoryUpdate, session: Session = Depends(get_session)):
+    from app.modules.finanzas.models import Category
+    cat = session.get(Category, id)
     if not cat:
         raise HTTPException(404)
-    if body.estimacion_mensual is not None:
-        cat.estimacion_mensual = body.estimacion_mensual
-    if body.activa is not None:
-        cat.activa = body.activa
+    if body.monthly_estimate is not None:
+        cat.monthly_estimate = body.monthly_estimate
+    if body.active is not None:
+        cat.active = body.active
     session.add(cat)
     session.commit()
     session.refresh(cat)
     return cat
 
 
-@router.delete("/categorias/{id}", status_code=204)
-def delete_categoria(id: int, session: Session = Depends(get_session)):
-    from app.modules.finanzas.models import Categoria
-    cat = session.get(Categoria, id)
+@router.delete("/categories/{id}", status_code=204)
+def delete_category(id: int, session: Session = Depends(get_session)):
+    from app.modules.finanzas.models import Category
+    cat = session.get(Category, id)
     if not cat:
         raise HTTPException(404)
     session.delete(cat)
     session.commit()
 
 
-@router.get("/gastos")
-def get_gastos(
-    anio: int | None = Query(None),
-    mes: int | None = Query(None),
-    categoria_id: int | None = Query(None),
-    busqueda: str | None = Query(None),
-    desde: str | None = Query(None),
-    hasta: str | None = Query(None),
+@router.get("/expenses")
+def get_expenses(
+    year: int | None = Query(None),
+    month: int | None = Query(None),
+    category_id: int | None = Query(None),
+    search: str | None = Query(None),
+    from_date: str | None = Query(None),
+    to_date: str | None = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=5000),
-    orden: str = Query("fecha"),
+    order: str = Query("date"),
     asc: bool = Query(False),
     session: Session = Depends(get_session),
 ):
-    gastos, total = get_gastos_filtrados(session, anio, mes, categoria_id,
-                                          busqueda, desde, hasta, page, per_page, orden, asc)
+    expenses, total = get_expenses_filtered(session, year, month, category_id,
+                                             search, from_date, to_date, page, per_page, order, asc)
     return {
         "total": total,
         "page": page,
         "per_page": per_page,
         "items": [
             {
-                "id": g.id,
-                "cantidad": g.cantidad,
-                "descripcion": g.descripcion,
-                "fecha": g.fecha,
-                "fuente": g.fuente,
-                "categoria": {"id": cat.id, "nombre": cat.nombre} if cat else None,
+                "id": e.id,
+                "amount": e.amount,
+                "description": e.description,
+                "date": e.date,
+                "source": e.source,
+                "category": {"id": cat.id, "name": cat.name} if cat else None,
             }
-            for g, cat in gastos
+            for e, cat in expenses
         ]
     }
 
 
-@router.post("/gastos", status_code=201)
-def post_gasto(body: GastoCreate, session: Session = Depends(get_session)):
+@router.post("/expenses", status_code=201)
+def post_expense(body: ExpenseCreate, session: Session = Depends(get_session)):
     from datetime import datetime, timezone
-    fecha = None
-    if body.fecha:
+    date = None
+    if body.date:
         try:
-            fecha = datetime.fromisoformat(body.fecha).replace(tzinfo=timezone.utc)
+            date = datetime.fromisoformat(body.date).replace(tzinfo=timezone.utc)
         except ValueError:
-            raise HTTPException(400, "Formato de fecha inválido")
-    from app.modules.finanzas.models import Gasto
-    gasto = Gasto(
-        cantidad=body.cantidad,
-        categoria_id=body.categoria_id,
-        descripcion=body.descripcion,
-        fuente="manual",
-        **({"fecha": fecha} if fecha else {})
+            raise HTTPException(400, "Invalid date format")
+    from app.modules.finanzas.models import Expense
+    expense = Expense(
+        amount=body.amount,
+        category_id=body.category_id,
+        description=body.description,
+        source="manual",
+        **({"date": date} if date else {})
     )
-    session.add(gasto)
+    session.add(expense)
     session.commit()
-    session.refresh(gasto)
-    return gasto
+    session.refresh(expense)
+    return expense
 
 
-@router.patch("/gastos/{id}")
-def patch_gasto(id: int, body: GastoUpdate, session: Session = Depends(get_session)):
-    from app.modules.finanzas.models import Gasto
+@router.patch("/expenses/{id}")
+def patch_expense(id: int, body: ExpenseUpdate, session: Session = Depends(get_session)):
+    from app.modules.finanzas.models import Expense
     from datetime import datetime, timezone
-    gasto = session.get(Gasto, id)
-    if not gasto:
+    expense = session.get(Expense, id)
+    if not expense:
         raise HTTPException(404)
-    if body.cantidad is not None:
-        gasto.cantidad = body.cantidad
-    if body.descripcion is not None:
-        gasto.descripcion = body.descripcion
-    if body.categoria_id is not None:
-        gasto.categoria_id = body.categoria_id
-    if body.fecha is not None:
+    if body.amount is not None:
+        expense.amount = body.amount
+    if body.description is not None:
+        expense.description = body.description
+    if body.category_id is not None:
+        expense.category_id = body.category_id
+    if body.date is not None:
         try:
-            gasto.fecha = datetime.fromisoformat(body.fecha).replace(tzinfo=timezone.utc)
+            expense.date = datetime.fromisoformat(body.date).replace(tzinfo=timezone.utc)
         except ValueError:
-            raise HTTPException(400, "Formato de fecha inválido")
-    session.add(gasto)
+            raise HTTPException(400, "Invalid date format")
+    session.add(expense)
     session.commit()
-    session.refresh(gasto)
-    return gasto
+    session.refresh(expense)
+    return expense
 
 
-@router.delete("/gastos/{id}", status_code=204)
-def delete_gasto(id: int, session: Session = Depends(get_session)):
-    from app.modules.finanzas.models import Gasto
-    gasto = session.get(Gasto, id)
-    if not gasto:
+@router.delete("/expenses/{id}", status_code=204)
+def delete_expense(id: int, session: Session = Depends(get_session)):
+    from app.modules.finanzas.models import Expense
+    expense = session.get(Expense, id)
+    if not expense:
         raise HTTPException(404)
-    session.delete(gasto)
+    session.delete(expense)
     session.commit()
 
 
-@router.get("/resumen")
-def get_resumen(
-    anio: int | None = Query(None),
-    mes: int | None = Query(None),
+@router.get("/summary")
+def get_summary(
+    year: int | None = Query(None),
+    month: int | None = Query(None),
     session: Session = Depends(get_session)
 ):
     return {
-        "categorias": resumen_mes(session, anio, mes),
-        "total": total_mes_global(session, anio, mes),
+        "categories": month_summary(session, year, month),
+        "total": month_total(session, year, month),
     }
 
 
-@router.get("/evolucion")
-def get_evolucion(meses: int = Query(12, ge=2, le=24), session: Session = Depends(get_session)):
-    return evolucion_mensual(session, meses)
+@router.get("/evolution")
+def get_evolution(months: int = Query(12, ge=2, le=24), session: Session = Depends(get_session)):
+    return monthly_evolution(session, months)
 
 
-@router.get("/meses")
-def get_meses(session: Session = Depends(get_session)):
-    return meses_disponibles(session)
+@router.get("/months")
+def get_months(session: Session = Depends(get_session)):
+    return available_months(session)
 
 
-class ImportarRow(BaseModel):
-    fecha: str | None = None
-    descripcion: str | None = None
-    cantidad: float
-    categoria_id: int | None = None
+class ImportRow(BaseModel):
+    date: str | None = None
+    description: str | None = None
+    amount: float
+    category_id: int | None = None
 
 
-@router.post("/importar/preview")
-async def importar_preview(file: UploadFile = File(...), session: Session = Depends(get_session)):
+@router.post("/import/preview")
+async def import_preview(file: UploadFile = File(...), session: Session = Depends(get_session)):
     from app.modules.finanzas.importer import parse_ing_xls
     content = await file.read()
     try:
         rows = parse_ing_xls(content, session)
     except Exception as e:
-        raise HTTPException(400, f"Error al procesar archivo: {e}")
+        raise HTTPException(400, f"Error processing file: {e}")
     return rows
 
 
-@router.post("/importar/confirmar", status_code=201)
-def importar_confirmar(rows: list[ImportarRow], session: Session = Depends(get_session)):
-    from app.modules.finanzas.models import Gasto
+@router.post("/import/confirm", status_code=201)
+def import_confirm(rows: list[ImportRow], session: Session = Depends(get_session)):
+    from app.modules.finanzas.models import Expense
     from datetime import datetime, timezone
     saved = 0
     for row in rows:
-        fecha = None
-        if row.fecha:
+        date = None
+        if row.date:
             try:
-                fecha = datetime.fromisoformat(row.fecha.replace("Z", "+00:00"))
-                if fecha.tzinfo is None:
-                    fecha = fecha.replace(tzinfo=timezone.utc)
+                date = datetime.fromisoformat(row.date.replace("Z", "+00:00"))
+                if date.tzinfo is None:
+                    date = date.replace(tzinfo=timezone.utc)
             except ValueError:
                 pass
-        g = Gasto(
-            cantidad=row.cantidad,
-            categoria_id=row.categoria_id,
-            descripcion=row.descripcion,
-            fuente="importacion",
-            **({"fecha": fecha} if fecha else {}),
+        e = Expense(
+            amount=row.amount,
+            category_id=row.category_id,
+            description=row.description,
+            source="import",
+            **({"date": date} if date else {}),
         )
-        session.add(g)
+        session.add(e)
         saved += 1
     session.commit()
-    return {"importados": saved}
+    return {"imported": saved}

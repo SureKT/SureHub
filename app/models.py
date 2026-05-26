@@ -1,4 +1,3 @@
 from sqlmodel import SQLModel
-# Los modelos de cada módulo se importan aquí para que create_db() los registre
-from app.modules.finanzas.models import Gasto, GastoRecurrente  # noqa: F401
-from app.modules.memoria.models import Memoria  # noqa: F401
+from app.modules.finanzas.models import Expense, RecurringExpense, Category  # noqa: F401
+from app.modules.memoria.models import Memory  # noqa: F401
