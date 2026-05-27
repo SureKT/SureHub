@@ -16,7 +16,7 @@ from app.modules.spotify.analyzer import analyze_library
 from app.modules.spotify.library import fetch_library
 from app.modules.spotify.service import spotify_service
 
-router = APIRouter(prefix="/spotify", tags=["spotify"])
+router = APIRouter(prefix="/api/spotify", tags=["spotify"])
 
 
 # ── OAuth ─────────────────────────────────────────────────────────────────────

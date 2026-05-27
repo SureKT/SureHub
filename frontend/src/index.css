@@ -22,8 +22,32 @@
   --orange-bg:  rgba(251,191,36,.1);
   --purple:     #a78bfa;
   --purple-bg:  rgba(167,139,250,.1);
+  --accent-fg:  #0e0e0f;
   --radius:     10px;
   --radius-sm:  7px;
+}
+
+[data-theme="light"] {
+  --bg:         #f5f0e8;
+  --surface:    #ede8df;
+  --surface2:   #e5e0d7;
+  --surface3:   #ddd8cf;
+  --border:     rgba(0,0,0,0.15);
+  --border-dim: rgba(0,0,0,0.08);
+  --accent:     #4a9e72;
+  --accent-bg:  rgba(74,158,114,.12);
+  --accent-fg:  #fff;
+  --text:       #1a1a1a;
+  --text-dim:   #555;
+  --text-muted: #888;
+  --red:        #dc2626;
+  --red-bg:     rgba(220,38,38,.1);
+  --green:      #16a34a;
+  --green-bg:   rgba(22,163,74,.1);
+  --orange:     #d97706;
+  --orange-bg:  rgba(217,119,6,.1);
+  --purple:     #7c3aed;
+  --purple-bg:  rgba(124,58,237,.1);
 }
 
 html, body {

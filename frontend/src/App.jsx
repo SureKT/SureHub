@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ToastProvider } from './components/Toast'
 import Sidebar from './components/Sidebar'
@@ -7,6 +7,8 @@ import Gastos from './components/Gastos'
 import Categorias from './components/Categorias'
 import Memoria from './components/Memoria'
 import Recurrentes from './components/Recurrentes'
+import Spotify from './components/Spotify'
+import Settings from './components/Settings'
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -20,6 +22,11 @@ const qc = new QueryClient({
 
 function App() {
   const [view, setView] = useState('summary')
+
+  useEffect(() => {
+    const theme = localStorage.getItem('theme') || 'dark'
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [])
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem('sidebar-collapsed') === 'true'
   )
@@ -48,6 +55,8 @@ function App() {
             {view === 'categories' && <Categorias />}
             {view === 'recurring' && <Recurrentes />}
             {view === 'memory' && <Memoria />}
+            {view === 'spotify' && <Spotify onNavigate={setView} />}
+            {view === 'settings' && <Settings />}
           </main>
         </div>
       </ToastProvider>

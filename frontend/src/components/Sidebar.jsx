@@ -1,4 +1,4 @@
-import { BarChart2, Zap, Wrench } from 'lucide-react'
+import { BarChart2, Zap, Wrench, Music2, Settings } from 'lucide-react'
 import LogoMark from './LogoMark'
 
 const MODULES = [
@@ -12,6 +12,15 @@ const MODULES = [
       { id: 'expenses', label: 'Expenses' },
       { id: 'categories', label: 'Categories' },
       { id: 'recurring', label: 'Recurring' },
+    ],
+  },
+  {
+    id: 'spotify',
+    label: 'Spotify',
+    icon: Music2,
+    active: true,
+    items: [
+      { id: 'spotify', label: 'Library' },
     ],
   },
   {
@@ -139,32 +148,37 @@ export default function Sidebar({ activeView, onNavigate, collapsed, onToggleCol
         ))}
       </nav>
 
-      {/* Memory — global, footer */}
+      {/* Global footer: Memory + Settings */}
       {!collapsed && (
         <div style={{ borderTop: '1px solid var(--border-dim)', padding: '8px 0' }}>
-          <button
-            onClick={() => onNavigate('memory')}
-            style={{
-              display: 'block',
-              width: '100%',
-              textAlign: 'left',
-              background: activeView === 'memory' ? 'var(--surface2)' : 'none',
-              border: 'none',
-              borderLeft: activeView === 'memory' ? '2px solid var(--accent)' : '2px solid transparent',
-              borderRadius: 0,
-              color: activeView === 'memory' ? 'var(--text)' : 'var(--text-dim)',
-              padding: '7px 16px',
-              fontSize: 13,
-              cursor: 'pointer',
-              fontWeight: activeView === 'memory' ? 500 : 400,
-              whiteSpace: 'nowrap',
-              transition: 'background 0.15s, color 0.15s',
-            }}
-            onMouseEnter={e => { if (activeView !== 'memory') e.currentTarget.style.background = 'var(--surface3)' }}
-            onMouseLeave={e => { if (activeView !== 'memory') e.currentTarget.style.background = 'none' }}
-          >
-            Memory
-          </button>
+          {['memory', 'settings'].map(id => {
+            const label = id === 'memory' ? 'Memory' : 'Settings'
+            const isActive = activeView === id
+            return (
+              <button
+                key={id}
+                onClick={() => onNavigate(id)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  background: isActive ? 'var(--surface2)' : 'none',
+                  border: 'none',
+                  borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+                  borderRadius: 0,
+                  color: isActive ? 'var(--text)' : 'var(--text-dim)',
+                  padding: '7px 16px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  fontWeight: isActive ? 500 : 400,
+                  whiteSpace: 'nowrap',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--surface3)' }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'none' }}
+              >{label}</button>
+            )
+          })}
         </div>
       )}
 
