@@ -1,4 +1,4 @@
-import { BarChart2, Zap, Wrench, Music2, Settings } from 'lucide-react'
+import { BarChart2, Zap, Wrench, Music2, Settings, BookOpen } from 'lucide-react'
 import LogoMark from './LogoMark'
 
 const MODULES = [
@@ -12,6 +12,16 @@ const MODULES = [
       { id: 'expenses', label: 'Expenses' },
       { id: 'categories', label: 'Categories' },
       { id: 'recurring', label: 'Recurring' },
+    ],
+  },
+  {
+    id: 'diary',
+    label: 'Diary',
+    icon: BookOpen,
+    active: true,
+    items: [
+      { id: 'diary', label: 'Journal' },
+      { id: 'timeline', label: 'Timeline' },
     ],
   },
   {

@@ -37,6 +37,19 @@ export const spotifyStatus = (userId) => spotifyApi.get(`/status/${userId}`).the
 export const spotifyAnalyze = (userId) => spotifyApi.post(`/analyze/${userId}`).then(r => r.data)
 export const spotifyAuthUrl = (userId) => `/api/spotify/auth?telegram_user_id=${userId}`
 
+const diaryApi = axios.create({ baseURL: '/api/diary' })
+export const getDiaryCollections = () => diaryApi.get('/collections').then(r => r.data)
+export const createDiaryCollection = (data) => diaryApi.post('/collections', data).then(r => r.data)
+export const deleteDiaryCollection = (id) => diaryApi.delete(`/collections/${id}`)
+export const getDiaryFields = (params = {}) => diaryApi.get('/fields', { params }).then(r => r.data)
+export const createDiaryField = (data) => diaryApi.post('/fields', data).then(r => r.data)
+export const updateDiaryField = (id, data) => diaryApi.patch(`/fields/${id}`, data).then(r => r.data)
+export const deleteDiaryField = (id) => diaryApi.delete(`/fields/${id}`)
+export const getDiaryEntries = (params = {}) => diaryApi.get('/entries', { params }).then(r => r.data)
+export const createDiaryEntry = (data) => diaryApi.post('/entries', data).then(r => r.data)
+export const updateDiaryEntry = (id, data) => diaryApi.patch(`/entries/${id}`, data).then(r => r.data)
+export const deleteDiaryEntry = (id) => diaryApi.delete(`/entries/${id}`)
+
 const recApi = axios.create({ baseURL: '/api/finance/recurring' })
 export const getRecurring = (params = {}) => recApi.get('', { params }).then(r => r.data)
 export const createRecurring = (data) => recApi.post('', data).then(r => r.data)

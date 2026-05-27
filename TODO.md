@@ -6,11 +6,7 @@ Prioridad de arriba a abajo. Los módulos sin fecha son ideas capturadas, no com
 
 ## En curso
 
-- [ ] **Spotify — frontend** — backend completo (`/api/spotify`), falta vista React
-  - Auth flow con telegram_user_id → localStorage
-  - Status (conectado / no conectado)
-  - Trigger análisis + mostrar resultado Claude
-  - Stats: liked tracks, top géneros
+- [x] **Spotify — frontend** ✓ — Spotify.jsx + Settings.jsx + light theme
 
 ---
 
