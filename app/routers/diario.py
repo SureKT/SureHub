@@ -121,7 +121,7 @@ def post_entry(body: EntryCreate, session: Session = Depends(get_session)):
     date = None
     if body.date:
         try:
-            date = datetime.fromisoformat(body.date)
+            date = datetime.fromisoformat(body.date.replace("Z", "+00:00"))
             if date.tzinfo is None:
                 date = date.replace(tzinfo=timezone.utc)
         except ValueError:
@@ -138,7 +138,7 @@ def patch_entry(id: int, body: EntryUpdate, session: Session = Depends(get_sessi
     kwargs = body.model_dump(exclude_none=True)
     if "date" in kwargs:
         try:
-            d = datetime.fromisoformat(kwargs["date"])
+            d = datetime.fromisoformat(kwargs["date"].replace("Z", "+00:00"))
             kwargs["date"] = d if d.tzinfo else d.replace(tzinfo=timezone.utc)
         except ValueError:
             raise HTTPException(400, "Invalid date format")
