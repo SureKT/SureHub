@@ -1,12 +1,8 @@
 # SureHub
 
-Personal modular platform to manage finances, calendar, and daily life — powered by AI.
+Personal modular platform to manage finances, music, journaling, and daily life — powered by AI.
 
-## What is SureHub?
-
-SureHub is a self-hosted personal dashboard built for a single user. It centralizes daily tools — expense tracking, calendar management, and more — with an AI layer accessible via Telegram bot.
-
-No cloud dependency. No subscriptions. Runs on a local machine and deploys to a small VPS.
+Self-hosted, single-user, no cloud dependency. Runs locally and deploys to a small VPS.
 
 ## Stack
 
@@ -14,33 +10,21 @@ No cloud dependency. No subscriptions. Runs on a local machine and deploys to a 
 |---|---|
 | Backend | FastAPI + SQLModel |
 | Database | SQLite (local) / PostgreSQL (prod) |
-| Frontend | React + Vite + Tailwind |
+| Frontend | React + Vite (CSS custom properties, no UI framework) |
 | AI | Claude API (Anthropic) |
 | Bot | Telegram (python-telegram-bot) |
-| Infra | Docker + Hetzner VPS (~€4/mo) |
+| Infra | Docker + Hetzner VPS (~€4/mo) — planned |
 
 ## Modules
 
-### ✅ Finanzas
-Track expenses and recurring costs.
-- Monthly summary with budget vs actual
-- Expense log with category inference
-- Category management (variable / fixed)
-- Recurring expenses tracker
-- Import from CSV (Coda)
-
-### 🚧 Calendario *(in progress)*
-Manage Google Calendar via natural language through Telegram.
-- Create and reschedule events by chatting
-- Color and reminder configuration per event type
-
-### 🗓️ Planned
-
-| Module | Description |
-|---|---|
-| Diario | Daily journal with records, tasks, and timeline |
-| Correo | Email summaries, rules, and document analysis |
-| Noticias | Briefings and context aggregation |
+| Module | Status | Description |
+|---|---|---|
+| Finance | ✅ | Expense tracking, categories, recurring costs, monthly summary, ING import |
+| Diary | ✅ | Journal entries with text + structured metrics, timeline view |
+| Spotify | ✅ | Library analysis via Claude, OAuth via Telegram |
+| Calendar | 🗓️ planned | Google Calendar management via natural language |
+| News | 🗓️ planned | Briefings and topic aggregation |
+| Email | 🗓️ planned | Gmail summaries and automation |
 
 ## Getting Started
 
@@ -52,8 +36,8 @@ Manage Google Calendar via natural language through Telegram.
 ### Run locally
 
 ```bash
-# Backend
-uvicorn app.main:app --reload
+# Backend (from repo root, venv active)
+uvicorn app.main:app --reload --port 8001
 
 # Telegram bot (separate terminal)
 python -m bot.run
@@ -62,19 +46,11 @@ python -m bot.run
 cd frontend && npm run dev
 ```
 
-Or use the included `dev.bat` (Windows) to launch all three at once.
+Or use `dev.bat` (Windows) to launch all three at once.
 
 ### Ports
 - Backend: `8001`
 - Frontend: `5174`
-
-## Roadmap
-
-- [ ] Google Calendar module
-- [ ] Diario module
-- [ ] Email integration
-- [ ] Right sidebar for module config
-- [ ] Production deploy (Docker + Hetzner)
 
 ## License
 
