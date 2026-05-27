@@ -20,6 +20,11 @@ def create_collection(session: Session, name: str, type: str = "journal") -> Dia
 def delete_collection(session: Session, id: int) -> None:
     c = session.get(DiaryCollection, id)
     if c:
+        # Null out collection_id on entries — don't delete the entries themselves
+        orphans = list(session.exec(select(DiaryEntry).where(DiaryEntry.collection_id == id)).all())
+        for e in orphans:
+            e.collection_id = None
+            session.add(e)
         session.delete(c)
         session.commit()
 
@@ -57,6 +62,10 @@ def update_field(session: Session, id: int, **kwargs) -> MetricField | None:
 def delete_field(session: Session, id: int) -> None:
     f = session.get(MetricField, id)
     if f:
+        # Remove associated metric logs first
+        logs = list(session.exec(select(MetricLog).where(MetricLog.field_id == id)).all())
+        for log in logs:
+            session.delete(log)
         session.delete(f)
         session.commit()
 
