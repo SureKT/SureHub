@@ -70,7 +70,8 @@ def delete_category(id: int, session: Session = Depends(get_session)):
     cat = session.get(Category, id)
     if not cat:
         raise HTTPException(404)
-    session.delete(cat)
+    cat.active = False
+    session.add(cat)
     session.commit()
 
 
@@ -110,6 +111,8 @@ def get_expenses(
 
 @router.post("/expenses", status_code=201)
 def post_expense(body: ExpenseCreate, session: Session = Depends(get_session)):
+    if body.amount <= 0:
+        raise HTTPException(400, "amount must be positive")
     from datetime import datetime, timezone
     date = None
     if body.date:

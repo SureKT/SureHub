@@ -142,8 +142,6 @@ def patch_entry(id: int, body: EntryUpdate, session: Session = Depends(get_sessi
             kwargs["date"] = d if d.tzinfo else d.replace(tzinfo=timezone.utc)
         except ValueError:
             raise HTTPException(400, "Invalid date format")
-    if "metrics" in kwargs:
-        kwargs["metrics"] = [m for m in kwargs["metrics"]]
     e = update_entry(session, id, **kwargs)
     if not e:
         raise HTTPException(404)

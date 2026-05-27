@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from app.config import settings
-from app.database import get_session
+from app.database import get_session, engine
 from app.services.llm import chat
 from app.modules.finanzas.models import Expense, Category
 from app.modules.finanzas.parser import parse_expense
@@ -13,6 +13,7 @@ from app.modules.finanzas.service import (
     generate_recurring,
 )
 from app.modules.memoria.service import save_memory, list_memories, delete_memory, build_context
+from sqlmodel import Session
 
 MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio",
              "julio","agosto","septiembre","octubre","noviembre","diciembre"]
@@ -82,31 +83,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    session = next(get_session())
     filter_month = context.args and context.args[0].lower() in ("mes", "month")
 
-    if filter_month:
-        now = datetime.now(timezone.utc)
-        expenses_raw, total_count = get_expenses_filtered(
-            session, year=now.year, month=now.month,
-            page=1, per_page=15, order="date", asc=False
-        )
-    else:
-        expenses_raw = latest_expenses(session, 10)
-        total_count = len(expenses_raw)
+    with Session(engine) as session:
+        if filter_month:
+            now = datetime.now(timezone.utc)
+            expenses_raw, total_count = get_expenses_filtered(
+                session, year=now.year, month=now.month,
+                page=1, per_page=15, order="date", asc=False
+            )
+        else:
+            expenses_raw = latest_expenses(session, 10)
+            total_count = len(expenses_raw)
 
-    if not expenses_raw:
-        await update.message.reply_text("Sin gastos registrados.")
-        return
+        if not expenses_raw:
+            await update.message.reply_text("Sin gastos registrados.")
+            return
 
-    lines = []
-    for e, cat in expenses_raw:
-        cat_name = cat.name if cat else "—"
-        desc = f" {e.description}" if e.description else ""
-        date = e.date.strftime("%d/%m") if e.date else ""
-        lines.append(f"`{e.id:4d}` {date}  *{e.amount:.2f}€*  {cat_name}{desc}")
+        lines = []
+        for e, cat in expenses_raw:
+            cat_name = cat.name if cat else "—"
+            desc = f" {e.description}" if e.description else ""
+            date = e.date.strftime("%d/%m") if e.date else ""
+            lines.append(f"`{e.id:4d}` {date}  *{e.amount:.2f}€*  {cat_name}{desc}")
 
-    header = f"Mes actual ({total_count} gastos):" if filter_month else "Últimos gastos:"
+        header = f"Mes actual ({total_count} gastos):" if filter_month else "Últimos gastos:"
+
     await update.message.reply_text(header + "\n" + "\n".join(lines), parse_mode="Markdown")
 
 
@@ -122,22 +124,23 @@ async def cmd_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("ID debe ser un número.")
         return
 
-    session = next(get_session())
-    expense = session.get(Expense, expense_id)
-    if not expense:
-        await update.message.reply_text(f"No existe el gasto #{expense_id}.")
-        return
+    with Session(engine) as session:
+        expense = session.get(Expense, expense_id)
+        if not expense:
+            await update.message.reply_text(f"No existe el gasto #{expense_id}.")
+            return
 
-    cat = session.get(Category, expense.category_id) if expense.category_id else None
-    cat_name = cat.name if cat else "sin categoría"
-    desc = f" — {expense.description}" if expense.description else ""
+        cat = session.get(Category, expense.category_id) if expense.category_id else None
+        cat_name = cat.name if cat else "sin categoría"
+        desc = f" — {expense.description}" if expense.description else ""
+        amount = expense.amount
 
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("✓ Confirmar", callback_data=f"borrar:{expense_id}"),
         InlineKeyboardButton("✕ Cancelar", callback_data="borrar:cancel"),
     ]])
     await update.message.reply_text(
-        f"Borrar gasto #{expense_id}?\n`{expense.amount:.2f}€`  {cat_name}{desc}",
+        f"Borrar gasto #{expense_id}?\n`{amount:.2f}€`  {cat_name}{desc}",
         parse_mode="Markdown",
         reply_markup=keyboard,
     )
@@ -152,13 +155,13 @@ async def callback_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     expense_id = int(query.data.split(":")[1])
-    session = next(get_session())
-    expense = session.get(Expense, expense_id)
-    if not expense:
-        await query.edit_message_text("No encontrado.")
-        return
-    session.delete(expense)
-    session.commit()
+    with Session(engine) as session:
+        expense = session.get(Expense, expense_id)
+        if not expense:
+            await query.edit_message_text("No encontrado.")
+            return
+        session.delete(expense)
+        session.commit()
     await query.edit_message_text(f"✓ Gasto #{expense_id} eliminado.")
 
 
@@ -174,13 +177,12 @@ async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
     cat_id_str = query.data.split(":")[1]
     cat_id = int(cat_id_str) if cat_id_str != "0" else None
 
-    session = next(get_session())
-    register_expense(session, pending["amount"], cat_id, pending["description"])
+    with Session(engine) as session:
+        register_expense(session, pending["amount"], cat_id, pending["description"])
+        cat = session.get(Category, cat_id) if cat_id else None
+        cat_name = cat.name if cat else "sin categoría"
 
-    cat = session.get(Category, cat_id) if cat_id else None
-    cat_name = cat.name if cat else "sin categoría"
     context.user_data.pop("pending_expense", None)
-
     await query.edit_message_text(
         f"✓ *{pending['description']}* — {pending['amount']:.2f}€ ({cat_name})",
         parse_mode="Markdown"
@@ -190,9 +192,9 @@ async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    session = next(get_session())
-    summary = month_summary(session)
-    total = month_total(session)
+    with Session(engine) as session:
+        summary = month_summary(session)
+        total = month_total(session)
 
     if not summary:
         await update.message.reply_text("Sin categorías. Configúralas desde el dashboard.")
@@ -219,8 +221,9 @@ async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_categorias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    session = next(get_session())
-    cats = list_categories(session)
+    with Session(engine) as session:
+        cats = list_categories(session)
+
     if not cats:
         await update.message.reply_text("Sin categorías.")
         return
@@ -239,16 +242,18 @@ async def cmd_recuerda(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not fact:
         await update.message.reply_text("Uso: /recuerda <hecho>")
         return
-    session = next(get_session())
-    m = save_memory(session, fact)
-    await update.message.reply_text(f"✓ Guardado (#{m.id})")
+    with Session(engine) as session:
+        m = save_memory(session, fact)
+        mem_id = m.id
+    await update.message.reply_text(f"✓ Guardado (#{mem_id})")
 
 
 async def cmd_memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    session = next(get_session())
-    memories = list_memories(session)
+    with Session(engine) as session:
+        memories = list_memories(session)
+
     if not memories:
         await update.message.reply_text("Sin memoria guardada.")
         return
@@ -267,21 +272,22 @@ async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError:
         await update.message.reply_text("ID debe ser un número.")
         return
-    session = next(get_session())
-    ok = delete_memory(session, id_)
+    with Session(engine) as session:
+        ok = delete_memory(session, id_)
     await update.message.reply_text("✓ Olvidado." if ok else "No encontrado.")
 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    session = next(get_session())
     now = datetime.now(timezone.utc)
-    total = month_total(session)
-    prev_month = now.month - 1 or 12
-    prev_year = now.year if now.month > 1 else now.year - 1
-    prev_total = month_total(session, prev_year, prev_month)
-    summary = month_summary(session)
+    with Session(engine) as session:
+        total = month_total(session)
+        prev_month = now.month - 1 or 12
+        prev_year = now.year if now.month > 1 else now.year - 1
+        prev_total = month_total(session, prev_year, prev_month)
+        summary = month_summary(session)
+
     alerts = [r for r in summary if r["alert"]]
     active = [r for r in summary if r["total"] > 0]
     top = max(active, key=lambda r: r["total"]) if active else None
@@ -316,9 +322,9 @@ async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question = " ".join(context.args).strip() if context.args else ""
     if not question:
         question = "Analiza mis gastos de este mes. ¿En qué destaco positiva o negativamente? ¿Algún consejo concreto?"
-    session = next(get_session())
-    memory_context = build_context(session)
-    finance_context = _build_finance_context(session)
+    with Session(engine) as session:
+        memory_context = build_context(session)
+        finance_context = _build_finance_context(session)
     await update.message.reply_chat_action("typing")
     response = await asyncio.to_thread(chat, question, memory_context, finance_context)
     await update.message.reply_text(response, parse_mode="Markdown")
@@ -327,9 +333,10 @@ async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    session = next(get_session())
     now = datetime.now(timezone.utc)
-    result = generate_recurring(session, now.year, now.month)
+    with Session(engine) as session:
+        result = generate_recurring(session, now.year, now.month)
+
     total = result["total"]
     if total == 0:
         await update.message.reply_text("Todos los recurrentes ya generados este mes.")
@@ -348,25 +355,25 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     parsed = parse_expense(text)
     if parsed:
-        session = next(get_session())
-        cat = find_category(session, parsed.category_hint) if parsed.category_hint else None
+        with Session(engine) as session:
+            cat = find_category(session, parsed.category_hint) if parsed.category_hint else None
 
-        if cat:
-            register_expense(session, parsed.amount, cat.id, parsed.description)
-            await update.message.reply_text(
-                f"✓ *{parsed.description}* — {parsed.amount:.2f}€ ({cat.name})",
-                parse_mode="Markdown"
-            )
-        else:
-            context.user_data["pending_expense"] = {
-                "description": parsed.description,
-                "amount": parsed.amount,
-            }
-            await update.message.reply_text(
-                f"*{parsed.description}* — {parsed.amount:.2f}€\n¿Categoría?",
-                parse_mode="Markdown",
-                reply_markup=_category_keyboard(session),
-            )
+            if cat:
+                register_expense(session, parsed.amount, cat.id, parsed.description)
+                await update.message.reply_text(
+                    f"✓ *{parsed.description}* — {parsed.amount:.2f}€ ({cat.name})",
+                    parse_mode="Markdown"
+                )
+            else:
+                context.user_data["pending_expense"] = {
+                    "description": parsed.description,
+                    "amount": parsed.amount,
+                }
+                await update.message.reply_text(
+                    f"*{parsed.description}* — {parsed.amount:.2f}€\n¿Categoría?",
+                    parse_mode="Markdown",
+                    reply_markup=_category_keyboard(session),
+                )
         return
 
     await update.message.reply_text(
