@@ -6,6 +6,14 @@ Stack: FastAPI + SQLModel + SQLite/Postgres + Telegram bot + Claude API.
 
 > **Contexto de infra:** SureHub es la pieza custom de un proyecto mayor (homelab self-hosted, Bloque A). El estado de la infra y el server viven en el repo `SureKT/homelab` (`CLAUDE.md` + `STATE.md`). Para trabajo de infra/servidor, ese repo es la fuente de verdad. Convención: pull al empezar, actualiza estado y push al cambiar algo.
 
+> **Decisiones de roadmap (2026-06-09, auditoría "no reinventar la rueda"):** SureHub encoge a **capa de captura+orquestación** sobre servicios best-of-breed; no reimplementa categorías resueltas. Implicaciones para el código:
+> - **Diario:** módulo a **retirar** — journaling + métricas migran a Obsidian (plugins Dataview/Tracker). No desarrollar más `app/modules/diario/`. Migración de datos históricos pendiente.
+> - **Notas:** NO construir módulo — el almacén es un vault Obsidian (`.md`) en el server. SureHub solo tendrá un handler de bot que escribe `.md` con auto-tag IA.
+> - **Índice/búsqueda IA:** NO construir — se usa **Khoj** self-hosted (Claude como LLM, embeddings locales) sobre el vault + Paperless.
+> - **Finanzas:** mantener **mínimo**. Si se piden presupuestos/reglas/multi-cuenta → migrar a Firefly III, no reimplementar.
+> - **Core que sí es de SureHub:** bot Telegram (captura+orquestación), memoria del bot, finanzas mínimo.
+> Detalle completo y estado en `SureKT/homelab` → `STATE.md`.
+
 ## Comandos
 - Backend: `uvicorn app.main:app --reload` (desde raíz, venv activado)
 - Bot: `python -m bot.run` (segunda terminal, venv activado)
