@@ -4,6 +4,8 @@ Plataforma personal modular: finanzas, noticias, automatizaciones, agente IA.
 Usuario único: Sure (uso doméstico, sin auth, sin multiusuario).
 Stack: FastAPI + SQLModel + SQLite/Postgres + Telegram bot + Claude API.
 
+> **Contexto de infra:** SureHub es la pieza custom de un proyecto mayor (homelab self-hosted, Bloque A). El estado de la infra y el server viven en el repo `SureKT/homelab` (`CLAUDE.md` + `STATE.md`). Para trabajo de infra/servidor, ese repo es la fuente de verdad. Convención: pull al empezar, actualiza estado y push al cambiar algo.
+
 ## Comandos
 - Backend: `uvicorn app.main:app --reload` (desde raíz, venv activado)
 - Bot: `python -m bot.run` (segunda terminal, venv activado)
