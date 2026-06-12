@@ -18,7 +18,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 import app.models  # noqa: F401 — registers all models before create_db
 from bot.help_text import bot_commands
 from bot.handlers import (
-    start, cmd_help, message, cmd_gastos, cmd_borrar, callback_borrar, callback_categoria,
+    start, cmd_help, message, voice_message, cmd_gastos, cmd_borrar, callback_borrar, callback_categoria,
     cmd_mes, cmd_categorias, cmd_recuerda, cmd_memoria, cmd_olvidar, cmd_stats,
     cmd_generar, cmd_analisis, cmd_nota,
 )
@@ -61,6 +61,7 @@ def main():
     app.add_handler(CommandHandler("note", cmd_nota))
     app.add_handler(CallbackQueryHandler(callback_borrar, pattern="^borrar:"))
     app.add_handler(CallbackQueryHandler(callback_categoria, pattern="^cat:"))
+    app.add_handler(MessageHandler(filters.VOICE, voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
 
     # Spotify

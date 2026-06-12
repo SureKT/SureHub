@@ -4,7 +4,8 @@ WELCOME = (
     "*SureHub* — captura rápida\n\n"
     "Escribe sin comando:\n"
     "• *Gasto:* `mercadona 44` · `44.50 cena`\n"
-    "• *Nota:* texto libre (varias palabras) o `. idea`\n\n"
+    "• *Nota:* texto libre (varias palabras) o `. idea`\n"
+    "• *Voz:* manda un audio 🎤\n\n"
     "/help — lista completa de comandos"
 )
 
@@ -12,7 +13,7 @@ HELP = (
     "*SureHub — comandos*\n\n"
     "*Captura (sin comando)*\n"
     "• Gasto: `descripción cantidad` o `cantidad descripción`\n"
-    "• Nota: texto libre · `. nota corta` · /nota texto\n\n"
+    "• Nota: texto libre · `. nota corta` · /nota texto · 🎤 audio\n\n"
     "*Finanzas*\n"
     "/gastos — últimos 10 gastos\n"
     "/gastos mes — gastos del mes actual\n"

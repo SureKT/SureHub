@@ -1,3 +1,4 @@
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -250,6 +251,46 @@ class TestMemoria:
         update = make_update()
         await handlers.cmd_olvidar(update, make_context(args=["999"]))
         assert "No encontrado" in update.message.reply_text.call_args.args[0]
+
+
+class TestVoiceMessage:
+    async def test_voice_transcribed_and_saved(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(handlers.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+
+        async def fake_download(path):
+            Path(path).write_bytes(b"ogg")
+
+        tg_file = MagicMock()
+        tg_file.download_to_drive = fake_download
+        monkeypatch.setattr(handlers, "transcribe", lambda p: "nota dictada por voz")
+
+        update = make_update()
+        update.message.voice = MagicMock(file_id="fid")
+        context = make_context()
+        context.bot.get_file = AsyncMock(return_value=tg_file)
+
+        await handlers.voice_message(update, context)
+
+        reply = update.message.reply_text.call_args.args[0]
+        assert "Nota guardada (voz)" in reply
+        assert list((tmp_path / "inbox").glob("*.md"))
+
+    async def test_empty_transcription(self, monkeypatch):
+        monkeypatch.setattr(handlers, "transcribe", lambda p: "   ")
+
+        async def fake_download(path):
+            Path(path).write_bytes(b"ogg")
+
+        tg_file = MagicMock()
+        tg_file.download_to_drive = fake_download
+        update = make_update()
+        update.message.voice = MagicMock(file_id="fid")
+        context = make_context()
+        context.bot.get_file = AsyncMock(return_value=tg_file)
+
+        await handlers.voice_message(update, context)
+
+        assert "no tenía texto" in update.message.reply_text.call_args.args[0]
 
 
 class TestNoteRouting:

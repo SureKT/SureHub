@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     # Obsidian vault (notas .md planas, sin DB)
     OBSIDIAN_VAULT_PATH: str = "./data/obsidian"
 
+    # Whisper local (notas de voz en Telegram)
+    WHISPER_MODEL: str = "small"
+    WHISPER_DEVICE: str = "cpu"
+    WHISPER_COMPUTE_TYPE: str = "int8"
+    WHISPER_LANGUAGE: str = "es"
+
     # Spotify
     SPOTIFY_CLIENT_ID: str = ""
     SPOTIFY_CLIENT_SECRET: str = ""

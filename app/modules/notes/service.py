@@ -51,7 +51,12 @@ def generate_tags(text: str, llm: Callable[[str], str]) -> list[str]:
         return []
 
 
-def create_note(text: str, vault_path: str | Path, llm: Callable[[str], str] | None = None) -> Path:
+def create_note(
+    text: str,
+    vault_path: str | Path,
+    llm: Callable[[str], str] | None = None,
+    source: str = "telegram",
+) -> Path:
     tags = generate_tags(text, llm) if llm else []
     now = datetime.now().astimezone()
 
@@ -69,7 +74,7 @@ def create_note(text: str, vault_path: str | Path, llm: Callable[[str], str] | N
         "---\n"
         f"created: {now.isoformat(timespec='seconds')}\n"
         f"tags: [{', '.join(tags)}]\n"
-        "source: telegram\n"
+        f"source: {source}\n"
         "---\n\n"
         f"{text}\n"
     )

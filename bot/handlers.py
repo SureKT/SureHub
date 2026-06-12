@@ -1,5 +1,7 @@
 import asyncio
+import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.error import BadRequest
@@ -15,6 +17,7 @@ from app.modules.finanzas.service import (
 )
 from app.modules.memoria.service import save_memory, list_memories, delete_memory, build_context
 from app.modules.notes.service import create_note, extract_tags
+from app.services.transcribe import transcribe
 from bot.help_text import HELP, WELCOME
 from sqlmodel import Session
 
@@ -80,12 +83,38 @@ def note_text_from_message(text: str) -> str | None:
     return None
 
 
-async def _save_and_reply_note(update: Update, text: str):
+async def _save_and_reply_note(update: Update, text: str, *, source: str = "telegram", label: str = "Nota guardada"):
     await update.message.reply_chat_action("typing")
-    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, chat)
+    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, chat, source)
     tags = extract_tags(path)
     tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
-    await update.message.reply_text(f"Nota guardada: {path.name}{tags_str}")
+    await update.message.reply_text(f"{label}: {path.name}{tags_str}")
+
+
+async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    voice = update.message.voice
+    if not voice:
+        return
+
+    await update.message.reply_chat_action("typing")
+    tg_file = await context.bot.get_file(voice.file_id)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        audio_path = Path(tmp) / "voice.ogg"
+        await tg_file.download_to_drive(str(audio_path))
+        try:
+            text = await asyncio.to_thread(transcribe, audio_path)
+        except Exception:
+            await update.message.reply_text("No pude transcribir el audio. Inténtalo de nuevo.")
+            return
+
+    if not text.strip():
+        await update.message.reply_text("El audio no tenía texto reconocible.")
+        return
+
+    await _save_and_reply_note(update, text, source="telegram-voice", label="Nota guardada (voz)")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
