@@ -1,0 +1,273 @@
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from sqlmodel import Session, select
+from telegram import InlineKeyboardMarkup
+
+import bot.handlers as handlers
+from app.modules.finanzas.models import Expense
+from app.modules.finanzas.service import create_category, create_recurring
+from app.modules.memoria.service import list_memories, save_memory
+
+ALLOWED_USER_ID = 111  # matches TELEGRAM_ALLOWED_USER_IDS set in conftest
+
+
+@pytest.fixture(autouse=True)
+def bot_engine(engine, monkeypatch):
+    # Handlers open their own Session(engine) over the module-level engine;
+    # point it at the per-test in-memory engine.
+    monkeypatch.setattr(handlers, "engine", engine)
+    return engine
+
+
+def make_update(text=None, user_id=ALLOWED_USER_ID):
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.message.text = text
+    update.message.reply_text = AsyncMock()
+    update.message.reply_chat_action = AsyncMock()
+    return update
+
+
+def make_context(args=None, user_data=None):
+    context = MagicMock()
+    context.args = args or []
+    context.user_data = user_data if user_data is not None else {}
+    return context
+
+
+def make_callback_update(data, user_id=ALLOWED_USER_ID):
+    update = make_update(user_id=user_id)
+    query = MagicMock()
+    query.data = data
+    query.answer = AsyncMock()
+    query.edit_message_text = AsyncMock()
+    update.callback_query = query
+    return update, query
+
+
+class TestMessage:
+    async def test_expense_with_known_category(self, session):
+        cat = create_category(session, "Supermercado", "variable")
+        update = make_update("mercadona 44")
+
+        await handlers.message(update, make_context())
+
+        reply = update.message.reply_text.call_args.args[0]
+        assert "✓" in reply
+        assert "mercadona" in reply
+        assert "44.00€" in reply
+        assert "Supermercado" in reply
+
+        expenses = session.exec(select(Expense)).all()
+        assert len(expenses) == 1
+        assert expenses[0].amount == 44.0
+        assert expenses[0].category_id == cat.id
+
+    async def test_expense_without_category_asks(self, session):
+        update = make_update("farmacia 12")
+        context = make_context()
+
+        await handlers.message(update, context)
+
+        assert context.user_data["pending_expense"] == {
+            "description": "farmacia", "amount": 12.0,
+        }
+        kwargs = update.message.reply_text.call_args.kwargs
+        assert isinstance(kwargs["reply_markup"], InlineKeyboardMarkup)
+        assert "¿Categoría?" in update.message.reply_text.call_args.args[0]
+        # no expense registered until the user picks a category
+        assert session.exec(select(Expense)).all() == []
+
+    async def test_unparseable_message(self):
+        update = make_update("hola qué tal")
+
+        await handlers.message(update, make_context())
+
+        assert "No entiendo" in update.message.reply_text.call_args.args[0]
+
+    async def test_unauthorized_user_ignored(self):
+        update = make_update("mercadona 44", user_id=999)
+
+        await handlers.message(update, make_context())
+
+        update.message.reply_text.assert_not_called()
+
+
+class TestCallbackCategoria:
+    async def test_registers_pending_expense(self, session):
+        cat = create_category(session, "Salud", "variable")
+        update, query = make_callback_update(f"cat:{cat.id}")
+        context = make_context(user_data={
+            "pending_expense": {"description": "farmacia", "amount": 12.0},
+        })
+
+        await handlers.callback_categoria(update, context)
+
+        expenses = session.exec(select(Expense)).all()
+        assert len(expenses) == 1
+        assert expenses[0].category_id == cat.id
+        assert "pending_expense" not in context.user_data
+        assert "Salud" in query.edit_message_text.call_args.args[0]
+
+    async def test_sin_categoria_option(self, session):
+        update, query = make_callback_update("cat:0")
+        context = make_context(user_data={
+            "pending_expense": {"description": "algo", "amount": 5.0},
+        })
+
+        await handlers.callback_categoria(update, context)
+
+        expenses = session.exec(select(Expense)).all()
+        assert len(expenses) == 1
+        assert expenses[0].category_id is None
+
+    async def test_without_pending_expense(self):
+        update, query = make_callback_update("cat:1")
+
+        await handlers.callback_categoria(update, make_context())
+
+        assert "Sin gasto pendiente" in query.edit_message_text.call_args.args[0]
+
+
+class TestBorrar:
+    async def test_cmd_borrar_asks_confirmation(self, session):
+        e = Expense(amount=10.0, description="cine")
+        session.add(e)
+        session.commit()
+        session.refresh(e)
+
+        update = make_update()
+        await handlers.cmd_borrar(update, make_context(args=[str(e.id)]))
+
+        kwargs = update.message.reply_text.call_args.kwargs
+        assert isinstance(kwargs["reply_markup"], InlineKeyboardMarkup)
+
+    async def test_cmd_borrar_requires_numeric_id(self):
+        update = make_update()
+        await handlers.cmd_borrar(update, make_context(args=["abc"]))
+        assert "número" in update.message.reply_text.call_args.args[0]
+
+    async def test_callback_borrar_deletes(self, session):
+        e = Expense(amount=10.0)
+        session.add(e)
+        session.commit()
+        session.refresh(e)
+
+        update, query = make_callback_update(f"borrar:{e.id}")
+        await handlers.callback_borrar(update, make_context())
+
+        assert session.exec(select(Expense)).all() == []
+        assert "eliminado" in query.edit_message_text.call_args.args[0]
+
+    async def test_callback_borrar_cancel(self, session):
+        e = Expense(amount=10.0)
+        session.add(e)
+        session.commit()
+
+        update, query = make_callback_update("borrar:cancel")
+        await handlers.callback_borrar(update, make_context())
+
+        assert len(session.exec(select(Expense)).all()) == 1
+        assert "Cancelado" in query.edit_message_text.call_args.args[0]
+
+
+class TestGastos:
+    async def test_empty(self):
+        update = make_update()
+        await handlers.cmd_gastos(update, make_context())
+        assert "Sin gastos" in update.message.reply_text.call_args.args[0]
+
+    async def test_lists_latest(self, session):
+        session.add(Expense(amount=12.5, description="cine"))
+        session.commit()
+
+        update = make_update()
+        await handlers.cmd_gastos(update, make_context())
+
+        reply = update.message.reply_text.call_args.args[0]
+        assert "Últimos gastos" in reply
+        assert "12.50€" in reply
+        assert "cine" in reply
+
+
+class TestMemoria:
+    async def test_recuerda_saves(self, session):
+        update = make_update()
+        await handlers.cmd_recuerda(update, make_context(args=["le", "gusta", "el", "pádel"]))
+
+        memories = list_memories(session)
+        assert len(memories) == 1
+        assert memories[0].fact == "le gusta el pádel"
+        assert "✓ Guardado" in update.message.reply_text.call_args.args[0]
+
+    async def test_recuerda_without_args(self, session):
+        update = make_update()
+        await handlers.cmd_recuerda(update, make_context())
+        assert "Uso: /recuerda" in update.message.reply_text.call_args.args[0]
+        assert list_memories(session) == []
+
+    async def test_memoria_lists(self, session):
+        save_memory(session, "vive en Valencia")
+        update = make_update()
+        await handlers.cmd_memoria(update, make_context())
+        assert "vive en Valencia" in update.message.reply_text.call_args.args[0]
+
+    async def test_memoria_empty(self):
+        update = make_update()
+        await handlers.cmd_memoria(update, make_context())
+        assert "Sin memoria" in update.message.reply_text.call_args.args[0]
+
+    async def test_olvidar(self, session):
+        m = save_memory(session, "borrable")
+        update = make_update()
+        await handlers.cmd_olvidar(update, make_context(args=[str(m.id)]))
+        assert "Olvidado" in update.message.reply_text.call_args.args[0]
+        assert list_memories(session) == []
+
+    async def test_olvidar_missing(self):
+        update = make_update()
+        await handlers.cmd_olvidar(update, make_context(args=["999"]))
+        assert "No encontrado" in update.message.reply_text.call_args.args[0]
+
+
+class TestOtherCommands:
+    async def test_start_shows_help(self):
+        update = make_update()
+        await handlers.start(update, make_context())
+        assert "SureHub" in update.message.reply_text.call_args.args[0]
+
+    async def test_mes_without_categories(self):
+        update = make_update()
+        await handlers.cmd_mes(update, make_context())
+        assert "Sin categorías" in update.message.reply_text.call_args.args[0]
+
+    async def test_categorias_lists(self, session):
+        create_category(session, "Ocio", "variable", estimate=50)
+        update = make_update()
+        await handlers.cmd_categorias(update, make_context())
+        reply = update.message.reply_text.call_args.args[0]
+        assert "Ocio" in reply
+        assert "50€/mes" in reply
+
+    async def test_generar_creates_recurring(self, session):
+        create_recurring(session, "Netflix", 12.99)
+        update = make_update()
+        await handlers.cmd_generar(update, make_context())
+        reply = update.message.reply_text.call_args.args[0]
+        assert "Netflix" in reply
+        assert "generado" in reply
+
+    async def test_analisis_uses_mocked_llm(self, session, monkeypatch):
+        # never hit the real Claude API
+        llm_mock = MagicMock(return_value="análisis mock")
+        monkeypatch.setattr(handlers, "chat", llm_mock)
+        save_memory(session, "le gusta el pádel")
+
+        update = make_update()
+        await handlers.cmd_analisis(update, make_context())
+
+        llm_mock.assert_called_once()
+        memory_context = llm_mock.call_args.args[1]
+        assert "le gusta el pádel" in memory_context
+        assert update.message.reply_text.call_args.args[0] == "análisis mock"
