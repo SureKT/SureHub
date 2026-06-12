@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
@@ -16,8 +15,6 @@ from app.modules.finanzas.service import (
 )
 from app.modules.memoria.service import save_memory, list_memories, delete_memory, build_context
 from sqlmodel import Session
-
-logger = logging.getLogger("surehub.bot")
 
 MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio",
              "julio","agosto","septiembre","octubre","noviembre","diciembre"]
@@ -179,7 +176,6 @@ async def callback_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    logger.info("callback_categoria data=%s pending=%s", query.data, bool(context.user_data.get("pending_expense")))
     await query.answer()
 
     pending = context.user_data.get("pending_expense")
@@ -366,7 +362,6 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     text = update.message.text
-    logger.info("message text=%r", text)
 
     parsed = parse_expense(text)
     if parsed:
