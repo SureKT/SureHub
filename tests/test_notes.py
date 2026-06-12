@@ -25,6 +25,19 @@ def test_create_note_with_tags(tmp_path):
     assert extract_tags(path) == ["ideas", "app"]
 
 
+def test_short_note_skips_llm(tmp_path):
+    called = []
+
+    def spy(prompt: str) -> str:
+        called.append(prompt)
+        return '["x"]'
+
+    path = create_note("hola mundo", tmp_path, spy)
+    assert path.exists()
+    assert called == []
+    assert "tags: []" in path.read_text(encoding="utf-8")
+
+
 def test_llm_failure_still_writes_note(tmp_path):
     path = create_note("nota que no debe perderse", tmp_path, llm_fail)
 
@@ -69,4 +82,4 @@ def test_filename_slug_from_first_words(tmp_path):
     ('["a", "b", "c", "d", "e", "f", "g"]', ["a", "b", "c", "d", "e"]),
 ])
 def test_generate_tags_tolerant_parsing(raw, expected):
-    assert generate_tags("texto", lambda prompt: raw) == expected
+    assert generate_tags("nota con suficiente texto", lambda prompt: raw) == expected

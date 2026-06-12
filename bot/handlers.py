@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -7,7 +8,7 @@ from telegram.ext import ContextTypes
 from telegram.error import BadRequest
 from app.config import settings
 from app.database import get_session, engine
-from app.services.llm import chat
+from app.services.llm import chat, complete_tags
 from app.modules.finanzas.models import Expense, Category
 from app.modules.finanzas.parser import parse_expense
 from app.modules.finanzas.service import (
@@ -22,6 +23,7 @@ from bot.help_text import HELP, WELCOME
 from sqlmodel import Session
 
 NOTE_PREFIX = "."
+logger = logging.getLogger("surehub.bot")
 
 MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio",
              "julio","agosto","septiembre","octubre","noviembre","diciembre"]
@@ -85,7 +87,7 @@ def note_text_from_message(text: str) -> str | None:
 
 async def _save_and_reply_note(update: Update, text: str, *, source: str = "telegram", label: str = "Nota guardada"):
     await update.message.reply_chat_action("typing")
-    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, chat, source)
+    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, complete_tags, source)
     tags = extract_tags(path)
     tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
     await update.message.reply_text(f"{label}: {path.name}{tags_str}")
@@ -106,7 +108,8 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await tg_file.download_to_drive(str(audio_path))
         try:
             text = await asyncio.to_thread(transcribe, audio_path)
-        except Exception:
+        except Exception as exc:
+            logger.exception("Voice transcription failed: %s", exc)
             await update.message.reply_text("No pude transcribir el audio. Inténtalo de nuevo.")
             return
 

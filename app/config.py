@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
     WHISPER_LANGUAGE: str = "es"
+    WHISPER_CACHE_DIR: str = "/data/.cache/whisper"
+
+    # LLM — tags usan Haiku (barato); chat/análisis usan Sonnet
+    LLM_MODEL: str = "claude-sonnet-4-6"
+    TAG_MODEL: str = "claude-haiku-4-5"
 
     # Spotify
     SPOTIFY_CLIENT_ID: str = ""

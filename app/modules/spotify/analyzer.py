@@ -4,6 +4,7 @@ Analyzes a Spotify library using Claude (reuses app.services.llm).
 import json
 from collections import defaultdict
 
+from app.config import settings
 from app.services.llm import client as llm_client
 
 
@@ -103,7 +104,7 @@ def analyze_library(liked_tracks: list, playlists: list) -> tuple[dict, str]:
     prompt = _build_prompt(liked_tracks, playlists, stats)
 
     response = llm_client.messages.create(
-        model="claude-sonnet-4-6",
+        model=settings.LLM_MODEL,
         max_tokens=4096,
         messages=[{"role": "user", "content": prompt}],
     )

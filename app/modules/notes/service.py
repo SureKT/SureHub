@@ -43,6 +43,9 @@ def _parse_tags(raw: str) -> list[str]:
 
 
 def generate_tags(text: str, llm: Callable[[str], str]) -> list[str]:
+    # Notas muy cortas: sin llamada LLM (ahorro + poco contexto para tags útiles).
+    if len(text.strip()) < 12:
+        return []
     # La captura nunca debe perderse por un fallo del LLM: ante error, sin tags.
     try:
         response = llm(TAG_PROMPT.format(text=text))
