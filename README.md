@@ -20,7 +20,6 @@ Self-hosted, single-user, no cloud dependency. Runs locally and deploys to a sma
 | Module | Status | Description |
 |---|---|---|
 | Finance | ✅ | Expense tracking, categories, recurring costs, monthly summary, ING import |
-| Diary | ✅ | Journal entries with text + structured metrics, timeline view |
 | Spotify | ✅ | Library analysis via Claude, OAuth via Telegram |
 | Calendar | 🗓️ planned | Google Calendar management via natural language |
 | News | 🗓️ planned | Briefings and topic aggregation |

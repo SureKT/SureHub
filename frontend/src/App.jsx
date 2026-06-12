@@ -9,8 +9,6 @@ import Memoria from './components/Memoria'
 import Recurrentes from './components/Recurrentes'
 import Spotify from './components/Spotify'
 import Settings from './components/Settings'
-import Diary from './components/Diary'
-import Timeline from './components/Timeline'
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -59,8 +57,6 @@ function App() {
             {view === 'memory' && <Memoria />}
             {view === 'spotify' && <Spotify onNavigate={setView} />}
             {view === 'settings' && <Settings />}
-            {view === 'diary' && <Diary />}
-            {view === 'timeline' && <Timeline />}
           </main>
         </div>
       </ToastProvider>

@@ -10,19 +10,6 @@ Prioridad de arriba a abajo. Los módulos sin fecha son ideas capturadas, no com
 
 ---
 
-## Próximo
-
-- [ ] **Diario**
-  - Registros libres (journal, reflexiones)
-  - Logs estructurados con métricas variables (peso, mood, sueño, etc.)
-    - Configuración en settings: añadir/quitar campos con nombre + tipo (número, texto, escala 1-10)
-    - Reestructuración periódica — los campos cambian según objetivos
-  - Categorías / colecciones — etiquetar entradas y navegar por colección
-  - Timeline — colección especial de eventos vitales / grupo de amigos
-  - Sin IA por ahora
-
----
-
 ## Pendiente
 
 - [ ] **Calendario**
