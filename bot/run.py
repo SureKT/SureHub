@@ -19,7 +19,7 @@ import app.models  # noqa: F401 — registers all models before create_db
 from bot.handlers import (
     start, message, cmd_gastos, cmd_borrar, callback_borrar, callback_categoria,
     cmd_mes, cmd_categorias, cmd_recuerda, cmd_memoria, cmd_olvidar, cmd_stats,
-    cmd_generar, cmd_analisis,
+    cmd_generar, cmd_analisis, cmd_nota,
 )
 from app.modules.spotify.bot import (
     cmd_spotify_auth,
@@ -44,6 +44,8 @@ def main():
     app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("generar", cmd_generar))
     app.add_handler(CommandHandler("analisis", cmd_analisis))
+    app.add_handler(CommandHandler("nota", cmd_nota))
+    app.add_handler(CommandHandler("note", cmd_nota))
     app.add_handler(CallbackQueryHandler(callback_borrar, pattern="^borrar:"))
     app.add_handler(CallbackQueryHandler(callback_categoria, pattern="^cat:"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
