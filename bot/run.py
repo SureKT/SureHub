@@ -16,8 +16,9 @@ logger = logging.getLogger("surehub.bot")
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Error en handler", exc_info=context.error)
 import app.models  # noqa: F401 — registers all models before create_db
+from bot.help_text import bot_commands
 from bot.handlers import (
-    start, message, cmd_gastos, cmd_borrar, callback_borrar, callback_categoria,
+    start, cmd_help, message, cmd_gastos, cmd_borrar, callback_borrar, callback_categoria,
     cmd_mes, cmd_categorias, cmd_recuerda, cmd_memoria, cmd_olvidar, cmd_stats,
     cmd_generar, cmd_analisis, cmd_nota,
 )
@@ -28,12 +29,24 @@ from app.modules.spotify.bot import (
 )
 
 
+async def post_init(app):
+    await app.bot.set_my_commands(bot_commands())
+
+
 def main():
     create_db()
-    app = ApplicationBuilder().token(settings.TELEGRAM_BOT_TOKEN).build()
+    app = (
+        ApplicationBuilder()
+        .token(settings.TELEGRAM_BOT_TOKEN)
+        .post_init(post_init)
+        .build()
+    )
 
     # Core
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("ayuda", cmd_help))
+    app.add_handler(CommandHandler("comandos", cmd_help))
     app.add_handler(CommandHandler("gastos", cmd_gastos))
     app.add_handler(CommandHandler("borrar", cmd_borrar))
     app.add_handler(CommandHandler("mes", cmd_mes))

@@ -15,7 +15,10 @@ from app.modules.finanzas.service import (
 )
 from app.modules.memoria.service import save_memory, list_memories, delete_memory, build_context
 from app.modules.notes.service import create_note, extract_tags
+from bot.help_text import HELP, WELCOME
 from sqlmodel import Session
+
+NOTE_PREFIX = "."
 
 MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio",
              "julio","agosto","septiembre","octubre","noviembre","diciembre"]
@@ -66,30 +69,35 @@ def _category_keyboard(session) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+def note_text_from_message(text: str) -> str | None:
+    """Free text or `. prefix` → Obsidian note. Expense parser takes priority in message()."""
+    raw = text.strip()
+    if raw.startswith(NOTE_PREFIX):
+        inner = raw[len(NOTE_PREFIX):].strip()
+        return inner or None
+    if " " in raw and len(raw) >= 4:
+        return raw
+    return None
+
+
+async def _save_and_reply_note(update: Update, text: str):
+    await update.message.reply_chat_action("typing")
+    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, chat)
+    tags = extract_tags(path)
+    tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
+    await update.message.reply_text(f"Nota guardada: {path.name}{tags_str}")
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    await update.message.reply_text(
-        "*SureHub*\n\n"
-        "*Gastos*\n"
-        "• Texto libre: `mercadona 44`, `44.50 cena`, `farmacia 12`\n"
-        "• /gastos — últimos 10\n"
-        "• /gastos mes — filtrar mes actual\n"
-        "• /borrar <id> — eliminar gasto\n"
-        "• /mes — resumen del mes\n"
-        "• /stats — resumen rápido\n"
-        "• /generar — generar recurrentes del mes\n"
-        "• /analisis — análisis IA de tus finanzas\n"
-        "• /categorias\n\n"
-        "*Memoria*\n"
-        "• /recuerda <hecho>\n"
-        "• /memoria\n"
-        "• /olvidar <id>\n\n"
-        "*Notas*\n"
-        "• /nota <texto> — guardar en Obsidian con tags IA\n\n"
-        "O escríbeme.",
-        parse_mode="Markdown"
-    )
+    await update.message.reply_text(WELCOME, parse_mode="Markdown")
+
+
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    await update.message.reply_text(HELP, parse_mode="Markdown")
 
 
 async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -295,13 +303,9 @@ async def cmd_nota(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     text = " ".join(context.args).strip()
     if not text:
-        await update.message.reply_text("Uso: /nota <texto>")
+        await update.message.reply_text("Uso: /nota <texto>\nTambién puedes escribir texto libre o `. nota` sin comando.")
         return
-    await update.message.reply_chat_action("typing")
-    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, chat)
-    tags = extract_tags(path)
-    tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
-    await update.message.reply_text(f"Nota guardada: {path.name}{tags_str}")
+    await _save_and_reply_note(update, text)
 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -403,7 +407,15 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
         return
 
+    note = note_text_from_message(text)
+    if note:
+        await _save_and_reply_note(update, note)
+        return
+
     await update.message.reply_text(
-        "No entiendo. Escribe un gasto (ej: `mercadona 44`, `cena 32.50`) o usa /help.",
-        parse_mode="Markdown"
+        "No entiendo.\n"
+        "• Gasto: `mercadona 44`\n"
+        "• Nota: texto libre · `. idea` · /nota texto\n"
+        "/help — comandos",
+        parse_mode="Markdown",
     )

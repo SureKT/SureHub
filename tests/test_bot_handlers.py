@@ -79,12 +79,33 @@ class TestMessage:
         # no expense registered until the user picks a category
         assert session.exec(select(Expense)).all() == []
 
-    async def test_unparseable_message(self):
+    async def test_free_text_saved_as_note(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(handlers.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
         update = make_update("hola qué tal")
 
         await handlers.message(update, make_context())
 
+        reply = update.message.reply_text.call_args.args[0]
+        assert "Nota guardada:" in reply
+        assert list((tmp_path / "inbox").glob("*.md"))
+
+    async def test_dot_prefix_short_note(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(handlers.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+        update = make_update(". comprar leche")
+
+        await handlers.message(update, make_context())
+
+        assert "Nota guardada:" in update.message.reply_text.call_args.args[0]
+        content = next((tmp_path / "inbox").glob("*.md")).read_text(encoding="utf-8")
+        assert "comprar leche" in content
+
+    async def test_short_unparseable_shows_help(self):
+        update = make_update("hola")
+
+        await handlers.message(update, make_context())
+
         assert "No entiendo" in update.message.reply_text.call_args.args[0]
+        assert "/help" in update.message.reply_text.call_args.args[0]
 
     async def test_unauthorized_user_ignored(self):
         update = make_update("mercadona 44", user_id=999)
@@ -231,11 +252,29 @@ class TestMemoria:
         assert "No encontrado" in update.message.reply_text.call_args.args[0]
 
 
+class TestNoteRouting:
+    def test_note_text_from_message(self):
+        assert handlers.note_text_from_message(". idea") == "idea"
+        assert handlers.note_text_from_message("varias palabras aquí") == "varias palabras aquí"
+        assert handlers.note_text_from_message("hola") is None
+        assert handlers.note_text_from_message(".") is None
+
+
 class TestOtherCommands:
-    async def test_start_shows_help(self):
+    async def test_start_shows_welcome(self):
         update = make_update()
         await handlers.start(update, make_context())
-        assert "SureHub" in update.message.reply_text.call_args.args[0]
+        reply = update.message.reply_text.call_args.args[0]
+        assert "SureHub" in reply
+        assert "/help" in reply
+
+    async def test_help_lists_commands(self):
+        update = make_update()
+        await handlers.cmd_help(update, make_context())
+        reply = update.message.reply_text.call_args.args[0]
+        assert "/gastos" in reply
+        assert "/nota" in reply
+        assert "/spotify" in reply
 
     async def test_mes_without_categories(self):
         update = make_update()
