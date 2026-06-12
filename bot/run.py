@@ -7,6 +7,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
     level=logging.INFO,
 )
+# httpx loguea la URL completa (incluye el token del bot) en INFO → silenciar.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("surehub.bot")
 
 
