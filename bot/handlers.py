@@ -2,6 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
+from telegram.error import BadRequest
 from app.config import settings
 from app.database import get_session, engine
 from app.services.llm import chat
@@ -21,6 +22,14 @@ MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio",
 
 def allowed(update: Update) -> bool:
     return update.effective_user.id in settings.allowed_user_ids
+
+
+async def _edit_or_send(update: Update, query, text: str, **kwargs):
+    """Edita el mensaje del callback; si fue borrado del chat (BadRequest), manda uno nuevo."""
+    try:
+        await query.edit_message_text(text, **kwargs)
+    except BadRequest:
+        await update.effective_chat.send_message(text, **kwargs)
 
 
 def _bar(total: float, estimate: float) -> str:
@@ -151,18 +160,18 @@ async def callback_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     if query.data == "borrar:cancel":
-        await query.edit_message_text("Cancelado.")
+        await _edit_or_send(update, query, "Cancelado.")
         return
 
     expense_id = int(query.data.split(":")[1])
     with Session(engine) as session:
         expense = session.get(Expense, expense_id)
         if not expense:
-            await query.edit_message_text("No encontrado.")
+            await _edit_or_send(update, query, "No encontrado.")
             return
         session.delete(expense)
         session.commit()
-    await query.edit_message_text(f"✓ Gasto #{expense_id} eliminado.")
+    await _edit_or_send(update, query, f"✓ Gasto #{expense_id} eliminado.")
 
 
 async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -171,7 +180,7 @@ async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     pending = context.user_data.get("pending_expense")
     if not pending:
-        await query.edit_message_text("Sin gasto pendiente.")
+        await _edit_or_send(update, query, "Sin gasto pendiente.")
         return
 
     cat_id_str = query.data.split(":")[1]
@@ -183,7 +192,8 @@ async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
         cat_name = cat.name if cat else "sin categoría"
 
     context.user_data.pop("pending_expense", None)
-    await query.edit_message_text(
+    await _edit_or_send(
+        update, query,
         f"✓ *{pending['description']}* — {pending['amount']:.2f}€ ({cat_name})",
         parse_mode="Markdown"
     )

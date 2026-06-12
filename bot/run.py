@@ -1,6 +1,17 @@
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
+import logging
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from app.config import settings
 from app.database import create_db
+
+logging.basicConfig(
+    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger("surehub.bot")
+
+
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logger.error("Error en handler", exc_info=context.error)
 import app.models  # noqa: F401 — registers all models before create_db
 from bot.handlers import (
     start, message, cmd_gastos, cmd_borrar, callback_borrar, callback_categoria,
@@ -39,7 +50,9 @@ def main():
     app.add_handler(CommandHandler("spotify_status", cmd_spotify_status))
     app.add_handler(CommandHandler("spotify_analizar", cmd_spotify_analizar))
 
-    print("Bot arrancado en modo polling...")
+    app.add_error_handler(on_error)
+
+    logger.info("Bot arrancado en modo polling...")
     app.run_polling()
 
 
