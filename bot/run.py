@@ -65,7 +65,9 @@ def main():
     app.add_error_handler(on_error)
 
     logger.info("Bot arrancado en modo polling...")
-    app.run_polling()
+    # allowed_updates explícito: Telegram persiste el set entre llamadas a getUpdates;
+    # sin esto hereda un set previo que excluía callback_query (clicks en botones).
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
