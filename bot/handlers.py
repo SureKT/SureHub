@@ -14,6 +14,7 @@ from app.modules.finanzas.service import (
     generate_recurring,
 )
 from app.modules.memoria.service import save_memory, list_memories, delete_memory, build_context
+from app.modules.notes.service import create_note, extract_tags
 from sqlmodel import Session
 
 MONTHS_ES = ["enero","febrero","marzo","abril","mayo","junio",
@@ -84,6 +85,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /recuerda <hecho>\n"
         "• /memoria\n"
         "• /olvidar <id>\n\n"
+        "*Notas*\n"
+        "• /nota <texto> — guardar en Obsidian con tags IA\n\n"
         "O escríbeme.",
         parse_mode="Markdown"
     )
@@ -285,6 +288,20 @@ async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with Session(engine) as session:
         ok = delete_memory(session, id_)
     await update.message.reply_text("✓ Olvidado." if ok else "No encontrado.")
+
+
+async def cmd_nota(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not allowed(update):
+        return
+    text = " ".join(context.args).strip()
+    if not text:
+        await update.message.reply_text("Uso: /nota <texto>")
+        return
+    await update.message.reply_chat_action("typing")
+    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, chat)
+    tags = extract_tags(path)
+    tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
+    await update.message.reply_text(f"Nota guardada: {path.name}{tags_str}")
 
 
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):

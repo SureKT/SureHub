@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     TELEGRAM_MODE: str = "polling"
     WEBHOOK_URL: str = ""
 
+    # Obsidian vault (notas .md planas, sin DB)
+    OBSIDIAN_VAULT_PATH: str = "./data/obsidian"
+
     # Spotify
     SPOTIFY_CLIENT_ID: str = ""
     SPOTIFY_CLIENT_SECRET: str = ""
