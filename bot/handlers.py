@@ -33,12 +33,27 @@ def allowed(update: Update) -> bool:
     return update.effective_user.id in settings.allowed_user_ids
 
 
+async def safe_reply(update: Update, text: str, **kwargs):
+    """Responde garantizando entrega: si el Markdown está mal formado (BadRequest),
+    reintenta en texto plano. La captura nunca debe perderse de cara al usuario."""
+    try:
+        await update.message.reply_text(text, **kwargs)
+    except BadRequest:
+        kwargs.pop("parse_mode", None)
+        await update.message.reply_text(text, **kwargs)
+
+
 async def _edit_or_send(update: Update, query, text: str, **kwargs):
-    """Edita el mensaje del callback; si fue borrado del chat (BadRequest), manda uno nuevo."""
+    """Edita el mensaje del callback. Ante BadRequest reintenta sin Markdown; si aun
+    así falla (mensaje borrado del chat), manda uno nuevo en texto plano."""
     try:
         await query.edit_message_text(text, **kwargs)
     except BadRequest:
-        await update.effective_chat.send_message(text, **kwargs)
+        kwargs.pop("parse_mode", None)
+        try:
+            await query.edit_message_text(text, **kwargs)
+        except BadRequest:
+            await update.effective_chat.send_message(text, **kwargs)
 
 
 def _bar(total: float, estimate: float) -> str:
@@ -90,7 +105,7 @@ async def _save_and_reply_note(update: Update, text: str, *, source: str = "tele
     path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, complete_tags, source)
     tags = extract_tags(path)
     tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
-    await update.message.reply_text(f"{label}: {path.name}{tags_str}")
+    await safe_reply(update,f"{label}: {path.name}{tags_str}")
 
 
 async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -110,11 +125,11 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = await asyncio.to_thread(transcribe, audio_path)
         except Exception as exc:
             logger.exception("Voice transcription failed: %s", exc)
-            await update.message.reply_text("No pude transcribir el audio. Inténtalo de nuevo.")
+            await safe_reply(update,"No pude transcribir el audio. Inténtalo de nuevo.")
             return
 
     if not text.strip():
-        await update.message.reply_text("El audio no tenía texto reconocible.")
+        await safe_reply(update,"El audio no tenía texto reconocible.")
         return
 
     await _save_and_reply_note(update, text, source="telegram-voice", label="Nota guardada (voz)")
@@ -123,13 +138,13 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    await update.message.reply_text(WELCOME, parse_mode="Markdown")
+    await safe_reply(update,WELCOME, parse_mode="Markdown")
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    await update.message.reply_text(HELP, parse_mode="Markdown")
+    await safe_reply(update,HELP, parse_mode="Markdown")
 
 
 async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -149,7 +164,7 @@ async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             total_count = len(expenses_raw)
 
         if not expenses_raw:
-            await update.message.reply_text("Sin gastos registrados.")
+            await safe_reply(update,"Sin gastos registrados.")
             return
 
         lines = []
@@ -161,25 +176,25 @@ async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         header = f"Mes actual ({total_count} gastos):" if filter_month else "Últimos gastos:"
 
-    await update.message.reply_text(header + "\n" + "\n".join(lines), parse_mode="Markdown")
+    await safe_reply(update,header + "\n" + "\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     if not context.args:
-        await update.message.reply_text("Uso: /borrar <id>")
+        await safe_reply(update,"Uso: /borrar <id>")
         return
     try:
         expense_id = int(context.args[0])
     except ValueError:
-        await update.message.reply_text("ID debe ser un número.")
+        await safe_reply(update,"ID debe ser un número.")
         return
 
     with Session(engine) as session:
         expense = session.get(Expense, expense_id)
         if not expense:
-            await update.message.reply_text(f"No existe el gasto #{expense_id}.")
+            await safe_reply(update,f"No existe el gasto #{expense_id}.")
             return
 
         cat = session.get(Category, expense.category_id) if expense.category_id else None
@@ -191,7 +206,7 @@ async def cmd_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton("✓ Confirmar", callback_data=f"borrar:{expense_id}"),
         InlineKeyboardButton("✕ Cancelar", callback_data="borrar:cancel"),
     ]])
-    await update.message.reply_text(
+    await safe_reply(update,
         f"Borrar gasto #{expense_id}?\n`{amount:.2f}€`  {cat_name}{desc}",
         parse_mode="Markdown",
         reply_markup=keyboard,
@@ -250,7 +265,7 @@ async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total = month_total(session)
 
     if not summary:
-        await update.message.reply_text("Sin categorías. Configúralas desde el dashboard.")
+        await safe_reply(update,"Sin categorías. Configúralas desde el dashboard.")
         return
 
     variable = [r for r in summary if r["type"] == "variable" and (r["total"] > 0 or r["estimate"] > 0)]
@@ -268,7 +283,7 @@ async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
             lines.append(f"  {r['name']}: {r['total']:.0f}€{est}{alert}{bar}")
 
     lines.append(f"\n*Total: {total:.2f}€*")
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await safe_reply(update,"\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_categorias(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -278,14 +293,14 @@ async def cmd_categorias(update: Update, context: ContextTypes.DEFAULT_TYPE):
         cats = list_categories(session)
 
     if not cats:
-        await update.message.reply_text("Sin categorías.")
+        await safe_reply(update,"Sin categorías.")
         return
     variable = [c for c in cats if c.type == "variable"]
     fixed = [c for c in cats if c.type == "fixed"]
     lines = ["*Variable*"] + [f"  {c.name}" + (f" — {c.monthly_estimate:.0f}€/mes" if c.monthly_estimate > 0 else "") for c in variable]
     if fixed:
         lines += ["\n*Fijo*"] + [f"  {c.name}" + (f" — {c.monthly_estimate:.0f}€/mes" if c.monthly_estimate > 0 else "") for c in fixed]
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await safe_reply(update,"\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_recuerda(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -293,12 +308,12 @@ async def cmd_recuerda(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     fact = " ".join(context.args).strip()
     if not fact:
-        await update.message.reply_text("Uso: /recuerda <hecho>")
+        await safe_reply(update,"Uso: /recuerda <hecho>")
         return
     with Session(engine) as session:
         m = save_memory(session, fact)
         mem_id = m.id
-    await update.message.reply_text(f"✓ Guardado (#{mem_id})")
+    await safe_reply(update,f"✓ Guardado (#{mem_id})")
 
 
 async def cmd_memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -308,26 +323,26 @@ async def cmd_memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
         memories = list_memories(session)
 
     if not memories:
-        await update.message.reply_text("Sin memoria guardada.")
+        await safe_reply(update,"Sin memoria guardada.")
         return
     lines = [f"`{m.id}` {m.fact}" for m in memories]
-    await update.message.reply_text("*Memoria:*\n" + "\n".join(lines), parse_mode="Markdown")
+    await safe_reply(update,"*Memoria:*\n" + "\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
     if not context.args:
-        await update.message.reply_text("Uso: /olvidar <id>")
+        await safe_reply(update,"Uso: /olvidar <id>")
         return
     try:
         id_ = int(context.args[0])
     except ValueError:
-        await update.message.reply_text("ID debe ser un número.")
+        await safe_reply(update,"ID debe ser un número.")
         return
     with Session(engine) as session:
         ok = delete_memory(session, id_)
-    await update.message.reply_text("✓ Olvidado." if ok else "No encontrado.")
+    await safe_reply(update,"✓ Olvidado." if ok else "No encontrado.")
 
 
 async def cmd_nota(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -335,7 +350,7 @@ async def cmd_nota(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     text = " ".join(context.args).strip()
     if not text:
-        await update.message.reply_text("Uso: /nota <texto>\nTambién puedes escribir texto libre o `. nota` sin comando.")
+        await safe_reply(update,"Uso: /nota <texto>\nTambién puedes escribir texto libre o `. nota` sin comando.")
         return
     await _save_and_reply_note(update, text)
 
@@ -376,7 +391,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         lines.append("Todos los presupuestos OK")
 
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await safe_reply(update,"\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -390,7 +405,7 @@ async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
         finance_context = _build_finance_context(session)
     await update.message.reply_chat_action("typing")
     response = await asyncio.to_thread(chat, question, memory_context, finance_context)
-    await update.message.reply_text(response, parse_mode="Markdown")
+    await safe_reply(update,response, parse_mode="Markdown")
 
 
 async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -402,10 +417,10 @@ async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     total = result["total"]
     if total == 0:
-        await update.message.reply_text("Todos los recurrentes ya generados este mes.")
+        await safe_reply(update,"Todos los recurrentes ya generados este mes.")
         return
     lines = [f"✓ {g['name']} — {g['amount']:.2f}€" for g in result["generated"]]
-    await update.message.reply_text(
+    await safe_reply(update,
         f"*{total} gasto{'s' if total > 1 else ''} generado{'s' if total > 1 else ''}:*\n" + "\n".join(lines),
         parse_mode="Markdown"
     )
@@ -423,7 +438,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             if cat:
                 register_expense(session, parsed.amount, cat.id, parsed.description)
-                await update.message.reply_text(
+                await safe_reply(update,
                     f"✓ *{parsed.description}* — {parsed.amount:.2f}€ ({cat.name})",
                     parse_mode="Markdown"
                 )
@@ -432,7 +447,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "description": parsed.description,
                     "amount": parsed.amount,
                 }
-                await update.message.reply_text(
+                await safe_reply(update,
                     f"*{parsed.description}* — {parsed.amount:.2f}€\n¿Categoría?",
                     parse_mode="Markdown",
                     reply_markup=_category_keyboard(session),
@@ -444,10 +459,19 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _save_and_reply_note(update, note)
         return
 
-    await update.message.reply_text(
+    await safe_reply(update,
         "No entiendo.\n"
         "• Gasto: `mercadona 44`\n"
         "• Nota: texto libre · `. idea` · /nota texto\n"
         "/help — comandos",
         parse_mode="Markdown",
+    )
+
+
+async def unsupported_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Foto, documento, sticker, etc.: dar feedback en vez de callar."""
+    if not allowed(update):
+        return
+    await safe_reply(update,
+        "Solo entiendo texto y notas de voz por ahora.\n/help — comandos",
     )

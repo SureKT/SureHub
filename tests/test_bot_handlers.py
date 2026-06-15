@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from sqlmodel import Session, select
 from telegram import InlineKeyboardMarkup
+from telegram.error import BadRequest
 
 import bot.handlers as handlers
 from app.modules.finanzas.models import Expense
@@ -299,6 +300,46 @@ class TestNoteRouting:
         assert handlers.note_text_from_message("varias palabras aquí") == "varias palabras aquí"
         assert handlers.note_text_from_message("hola") is None
         assert handlers.note_text_from_message(".") is None
+
+
+class TestSafeReply:
+    async def test_plain_text_sends_once(self):
+        update = make_update()
+        await handlers.safe_reply(update, "hola", parse_mode="Markdown")
+        update.message.reply_text.assert_called_once()
+
+    async def test_falls_back_to_plain_on_bad_markdown(self):
+        update = make_update()
+        update.message.reply_text = AsyncMock(
+            side_effect=[BadRequest("Can't parse entities"), None]
+        )
+        await handlers.safe_reply(update, "roto *_[", parse_mode="Markdown")
+        assert update.message.reply_text.call_count == 2
+        # retry drops parse_mode so the text always reaches the user
+        assert "parse_mode" not in update.message.reply_text.call_args.kwargs
+        assert update.message.reply_text.call_args.args[0] == "roto *_["
+
+    async def test_retry_keeps_reply_markup(self):
+        update = make_update()
+        update.message.reply_text = AsyncMock(
+            side_effect=[BadRequest("Can't parse entities"), None]
+        )
+        markup = InlineKeyboardMarkup([])
+        await handlers.safe_reply(update, "x", parse_mode="Markdown", reply_markup=markup)
+        assert update.message.reply_text.call_args.kwargs["reply_markup"] is markup
+
+
+class TestUnsupportedMessage:
+    async def test_replies_with_hint(self):
+        update = make_update()
+        await handlers.unsupported_message(update, make_context())
+        reply = update.message.reply_text.call_args.args[0]
+        assert "voz" in reply.lower()
+
+    async def test_unauthorized_ignored(self):
+        update = make_update(user_id=999)
+        await handlers.unsupported_message(update, make_context())
+        update.message.reply_text.assert_not_called()
 
 
 class TestOtherCommands:

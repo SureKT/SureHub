@@ -18,9 +18,9 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 import app.models  # noqa: F401 — registers all models before create_db
 from bot.help_text import bot_commands
 from bot.handlers import (
-    start, cmd_help, message, voice_message, cmd_gastos, cmd_borrar, callback_borrar, callback_categoria,
-    cmd_mes, cmd_categorias, cmd_recuerda, cmd_memoria, cmd_olvidar, cmd_stats,
-    cmd_generar, cmd_analisis, cmd_nota,
+    start, cmd_help, message, voice_message, unsupported_message, cmd_gastos, cmd_borrar,
+    callback_borrar, callback_categoria, cmd_mes, cmd_categorias, cmd_recuerda, cmd_memoria,
+    cmd_olvidar, cmd_stats, cmd_generar, cmd_analisis, cmd_nota,
 )
 from app.modules.spotify.bot import (
     cmd_spotify_auth,
@@ -63,6 +63,12 @@ def main():
     app.add_handler(CallbackQueryHandler(callback_categoria, pattern="^cat:"))
     app.add_handler(MessageHandler(filters.VOICE, voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
+    # Catch-all para media no soportada (foto, documento, sticker…): registrado al
+    # final del grupo, solo captura lo que no casó con text/voice/comandos.
+    app.add_handler(MessageHandler(
+        ~filters.TEXT & ~filters.VOICE & ~filters.COMMAND & ~filters.StatusUpdate.ALL,
+        unsupported_message,
+    ))
 
     # Spotify
     app.add_handler(CommandHandler("spotify_auth", cmd_spotify_auth))
