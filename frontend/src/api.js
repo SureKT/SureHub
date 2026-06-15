@@ -32,11 +32,6 @@ export const createMemory = (fact) => memApi.post('', { fact }).then(r => r.data
 export const updateMemory = (id, fact) => memApi.patch(`/${id}`, { fact }).then(r => r.data)
 export const deleteMemory = (id) => memApi.delete(`/${id}`)
 
-const spotifyApi = axios.create({ baseURL: '/api/spotify' })
-export const spotifyStatus = (userId) => spotifyApi.get(`/status/${userId}`).then(r => r.data)
-export const spotifyAnalyze = (userId) => spotifyApi.post(`/analyze/${userId}`).then(r => r.data)
-export const spotifyAuthUrl = (userId) => `/api/spotify/auth?telegram_user_id=${userId}`
-
 const recApi = axios.create({ baseURL: '/api/finance/recurring' })
 export const getRecurring = (params = {}) => recApi.get('', { params }).then(r => r.data)
 export const createRecurring = (data) => recApi.post('', data).then(r => r.data)

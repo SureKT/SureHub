@@ -6,5 +6,4 @@ def test_bot_commands_registered():
     assert "help" in names
     assert "gastos" in names
     assert "nota" in names
-    assert "spotify_auth" in names
     assert len(names) >= 10

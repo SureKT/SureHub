@@ -30,10 +30,6 @@ HELP = (
     "/recuerda — guardar un hecho\n"
     "/memoria — ver memoria guardada\n"
     "/olvidar — borrar por id\n\n"
-    "*Spotify*\n"
-    "/spotify\\_auth — conectar cuenta\n"
-    "/spotify\\_status — estado de conexión\n"
-    "/spotify\\_analizar — análisis IA de tu biblioteca\n\n"
     "/start — mensaje de bienvenida"
 )
 
@@ -51,6 +47,4 @@ def bot_commands() -> list[BotCommand]:
         BotCommand("generar", "Gastos recurrentes del mes"),
         BotCommand("categorias", "Listar categorías"),
         BotCommand("borrar", "Eliminar gasto"),
-        BotCommand("spotify_auth", "Conectar Spotify"),
-        BotCommand("spotify_analizar", "Analizar biblioteca Spotify"),
     ]

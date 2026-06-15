@@ -7,7 +7,6 @@ import Gastos from './components/Gastos'
 import Categorias from './components/Categorias'
 import Memoria from './components/Memoria'
 import Recurrentes from './components/Recurrentes'
-import Spotify from './components/Spotify'
 import Settings from './components/Settings'
 
 const qc = new QueryClient({
@@ -55,7 +54,6 @@ function App() {
             {view === 'categories' && <Categorias />}
             {view === 'recurring' && <Recurrentes />}
             {view === 'memory' && <Memoria />}
-            {view === 'spotify' && <Spotify onNavigate={setView} />}
             {view === 'settings' && <Settings />}
           </main>
         </div>

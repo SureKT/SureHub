@@ -356,7 +356,6 @@ class TestOtherCommands:
         reply = update.message.reply_text.call_args.args[0]
         assert "/gastos" in reply
         assert "/nota" in reply
-        assert "/spotify" in reply
 
     async def test_mes_without_categories(self):
         update = make_update()

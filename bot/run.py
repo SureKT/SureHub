@@ -22,11 +22,6 @@ from bot.handlers import (
     callback_borrar, callback_categoria, cmd_mes, cmd_categorias, cmd_recuerda, cmd_memoria,
     cmd_olvidar, cmd_stats, cmd_generar, cmd_analisis, cmd_nota,
 )
-from app.modules.spotify.bot import (
-    cmd_spotify_auth,
-    cmd_spotify_status,
-    cmd_spotify_analizar,
-)
 
 
 async def post_init(app):
@@ -69,11 +64,6 @@ def main():
         ~filters.TEXT & ~filters.VOICE & ~filters.COMMAND & ~filters.StatusUpdate.ALL,
         unsupported_message,
     ))
-
-    # Spotify
-    app.add_handler(CommandHandler("spotify_auth", cmd_spotify_auth))
-    app.add_handler(CommandHandler("spotify_status", cmd_spotify_status))
-    app.add_handler(CommandHandler("spotify_analizar", cmd_spotify_analizar))
 
     app.add_error_handler(on_error)
 
