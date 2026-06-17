@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./surehub.db"
     TELEGRAM_MODE: str = "polling"
     WEBHOOK_URL: str = ""
+    TIMEZONE: str = "Europe/Madrid"  # hora local para timestamps de notas
 
     # Obsidian vault (notas .md planas, sin DB)
     OBSIDIAN_VAULT_PATH: str = "./data/obsidian"

@@ -4,6 +4,7 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
+from zoneinfo import ZoneInfo
 
 TAG_PROMPT = (
     "Genera entre 2 y 5 tags cortos en minúscula para clasificar esta nota. "
@@ -59,9 +60,12 @@ def create_note(
     vault_path: str | Path,
     llm: Callable[[str], str] | None = None,
     source: str = "telegram",
+    tz: str = "Europe/Madrid",
 ) -> Path:
     tags = generate_tags(text, llm) if llm else []
-    now = datetime.now().astimezone()
+    # Hora local explícita: el contenedor corre en UTC, así el timestamp y el nombre
+    # de fichero no quedan 2h desfasados respecto a la hora real (UTC+1/+2).
+    now = datetime.now(ZoneInfo(tz))
 
     inbox = Path(vault_path) / "inbox"
     inbox.mkdir(parents=True, exist_ok=True)

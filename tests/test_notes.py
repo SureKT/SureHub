@@ -74,6 +74,20 @@ def test_filename_slug_from_first_words(tmp_path):
     assert path.name.endswith("-comprar-cafe-para-la-oficina.md")
 
 
+def test_create_note_uses_explicit_timezone(tmp_path):
+    # Tokyo no tiene DST → offset siempre +09:00, test estable independiente de la fecha.
+    path = create_note("nota con zona horaria explicita", tmp_path, llm_ok, tz="Asia/Tokyo")
+    created = next(l for l in path.read_text(encoding="utf-8").splitlines() if l.startswith("created:"))
+    assert "+09:00" in created
+
+
+def test_create_note_default_timezone_is_madrid(tmp_path):
+    path = create_note("otra nota con zona por defecto", tmp_path, llm_ok)
+    created = next(l for l in path.read_text(encoding="utf-8").splitlines() if l.startswith("created:"))
+    # Europe/Madrid: +01:00 (invierno) o +02:00 (verano), nunca UTC.
+    assert "+01:00" in created or "+02:00" in created
+
+
 @pytest.mark.parametrize("raw,expected", [
     ('["ideas", "trabajo"]', ["ideas", "trabajo"]),
     ('Aquí tienes: ["casa", "compras"]', ["casa", "compras"]),

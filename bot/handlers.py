@@ -102,7 +102,7 @@ def note_text_from_message(text: str) -> str | None:
 
 async def _save_and_reply_note(update: Update, text: str, *, source: str = "telegram", label: str = "Nota guardada"):
     await update.message.reply_chat_action("typing")
-    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, complete_tags, source)
+    path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, complete_tags, source, settings.TIMEZONE)
     tags = extract_tags(path)
     tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
     await safe_reply(update,f"{label}: {path.name}{tags_str}")
