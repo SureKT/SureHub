@@ -1,0 +1,29 @@
+name: deploy
+
+# Auto-deploy al server homelab (surehub-home) al mergear a main.
+# Runner self-hosted: long-poll saliente a GitHub, sin puerto entrante (Tailscale-only).
+# Datos en el volumen /srv/surehub/data → el rebuild no los pierde.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:           # encola merges solapados, sin carreras de deploy
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, surehub-home]
+    steps:
+      - name: Pull latest source
+        run: |
+          cd /srv/surehub/src
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: Rebuild and restart containers
+        run: docker compose -f ~/homelab/docker-compose/surehub/docker-compose.yml up -d --build
+
+      - name: Prune dangling images
+        run: docker image prune -f
