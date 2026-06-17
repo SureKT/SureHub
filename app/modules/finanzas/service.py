@@ -93,15 +93,17 @@ def latest_expenses(session: Session, n: int = 5) -> list[tuple[Expense, Categor
     return result
 
 
-def _month_range(year: int, month: int) -> tuple[datetime, datetime]:
-    # Límites naive: las fechas se guardan como texto naive en SQLite ("YYYY-MM-DD
-    # HH:MM:SS"). Con tzinfo, el bind serializa "...+00:00" y la comparación de texto
-    # excluía los gastos del día 1 a medianoche (ej. Spotify recurrente). Naive compara
-    # bien tanto con filas naive (csv/import) como tz-aware (bot, llevan offset y hora real).
+def _month_range(year: int, month: int) -> tuple[str, str]:
+    # Límites como STRING, no datetime. Las fechas se guardan como texto en SQLite y la
+    # comparación es lexicográfica, pero conviven formatos: csv con microsegundos
+    # ("...00:00:00.000000"), import sin ellos ("...00:00:00") y bot tz-aware ("...+00:00").
+    # Un bound datetime se serializaba con ".000000" y dejaba fuera los import del día 1 a
+    # medianoche (ej. Spotify recurrente). Un string "YYYY-MM-DD 00:00:00" compara <= a los
+    # tres formatos, así que incluye todo el día 1.
     days = monthrange(year, month)[1]
     return (
-        datetime(year, month, 1),
-        datetime(year, month, days, 23, 59, 59),
+        f"{year:04d}-{month:02d}-01 00:00:00",
+        f"{year:04d}-{month:02d}-{days:02d} 23:59:59",
     )
 
 
