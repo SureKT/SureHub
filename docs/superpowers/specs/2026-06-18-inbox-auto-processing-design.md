@@ -118,7 +118,7 @@ Lo gestionas/marcas hecho desde la app de Obsidian en el móvil (Syncthing).
   hora = tarea con fecha.
 - Eventos → Fase 2 (Google Calendar / OAuth).
 
-## Preguntas abiertas (no bloquean Fase 1)
+## Decisiones de arranque (antes preguntas abiertas, ya resueltas)
 
-- ¿`Tareas.md` único o por área/fecha? (arranco con único; Dataview ya filtra).
-- ¿Modelo de clasificación Haiku vs Sonnet? (arranco Haiku por coste; subir si falla).
+- **`Tareas.md` único** en la raíz del vault (Dataview ya filtra por área/fecha si hace falta).
+- **Clasificación con Haiku** (`TAG_MODEL`) por coste; subir a Sonnet solo si la calidad falla.
