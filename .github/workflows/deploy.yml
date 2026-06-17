@@ -1,11 +1,15 @@
 name: deploy
 
-# Auto-deploy al server homelab (surehub-home) al mergear a main.
+# Auto-deploy al server homelab (surehub-home) cuando 'ci' pasa en main.
+# Gate: solo despliega si el workflow 'ci' (pytest + build) terminó en éxito → no se
+# despliega código roto (sustituye a branch protection, no disponible en repo privado free).
 # Runner self-hosted: long-poll saliente a GitHub, sin puerto entrante (Tailscale-only).
 # Datos en el volumen /srv/surehub/data → el rebuild no los pierde.
 
 on:
-  push:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
     branches: [main]
 
 concurrency:           # encola merges solapados, sin carreras de deploy
@@ -14,6 +18,8 @@ concurrency:           # encola merges solapados, sin carreras de deploy
 
 jobs:
   deploy:
+    # Solo si ci terminó verde. ci rojo → sin deploy, contenedores viejos siguen vivos.
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: [self-hosted, surehub-home]
     steps:
       - name: Pull latest source
