@@ -2,7 +2,7 @@
 
 Plataforma personal modular: finanzas, noticias, automatizaciones, agente IA.
 Usuario único: Sure (uso doméstico, sin auth, sin multiusuario).
-Stack: FastAPI + SQLModel + SQLite/Postgres + Telegram bot + Claude API.
+Stack: FastAPI + SQLModel + SQLite + Telegram bot + Claude API.
 
 > **Contexto de infra:** SureHub es la pieza custom de un proyecto mayor (homelab self-hosted, Bloque A). El estado de la infra y el server viven en el repo `SureKT/homelab` (`CLAUDE.md` + `STATE.md`). Para trabajo de infra/servidor, ese repo es la fuente de verdad. Convención: pull al empezar, actualiza estado y push al cambiar algo.
 
@@ -61,9 +61,10 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Tipos: `feat`, `fix`, `refactor`, `chore`
 
 ## Decisiones de arquitectura
-- SQLite en local, Postgres en prod — cambio solo en DATABASE_URL
+- **SQLite en local y prod** — prod corre en el server homelab (`surehub-home`), DB canónica en `/srv/surehub/data/surehub.db`. `DATABASE_URL` apunta ahí; Postgres descartado por ahora (uso personal, SQLite sobra)
+- **DB canónica = server**. El PC ya no corre SureHub (no arrancar `bot.run` en local con el mismo token → conflicto polling)
 - Telegram polling en local, webhook en prod — cambio en TELEGRAM_MODE
-- Bot y FastAPI corren como procesos separados en local, mismo container en prod
+- Bot y FastAPI corren como procesos separados en local, containers separados en prod (api/bot/frontend vía docker compose en el server)
 - Claude API model: `claude-sonnet-4-6` — cambiar solo si hay razón explícita
 - No hay historial de conversación en el bot — cada mensaje es independiente (decisión consciente, añadir si el uso real lo justifica)
 - Memoria del bot: manual vía /recuerda. Se inyecta en system prompt de Claude
@@ -81,9 +82,9 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - API prefix: `/api/finance` (categories, expenses, summary, evolution, months, import)
 - Ports: backend 8001, frontend 5174
 
-## Infraestructura objetivo
-- Local ahora: PC + 3 terminales (backend, bot, frontend)
-- Prod futuro: Hetzner VPS ~€4/mes, Docker, webhook Telegram, Postgres
+## Infraestructura
+- **Prod (actual):** server homelab `surehub-home` (Ubuntu, Tailscale). Docker compose: api (FastAPI interno) + bot (polling) + frontend (nginx `:8001`, proxya `/api`). DB SQLite canónica en volumen `/srv/surehub/data`. Auto-deploy on merge a main (`.github/workflows/deploy.yml`, gated por `ci`). Detalle en repo `SureKT/homelab` → `docs/surehub.md`
+- Local dev: PC + 3 terminales (backend, bot, frontend) contra SQLite local — pero la verdad vive en el server
 - Claude API: ~$5-15/mes uso personal moderado
 
 ---
