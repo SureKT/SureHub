@@ -76,7 +76,9 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Inactive categories (soft delete): Anillo, Ahorros (Coda), Luz, Agua (no se pagan ahora), Netflix/Spotify/Google One/Amazon Prime (fusionadas en `Suscripciones`)
 - 482 historical expenses from Coda (June 2025 → March 2026) + 152 backfill bancario ING (`source=import`, 28 mar → 17 jun 2026, script `scripts/classify_bank_marzo.py`). Total ~634
 - Coste fijo = módulo recurrente (single source): Vodafone, Gimnasio, Médicos Sin Fronteras, Spotify, Claude (mensuales) + Google One, Amazon Prime (anuales **prorrateados** = anual/12). Filas fijas del backfill están enlazadas vía `recurring_id` para que `generate_recurring` las salte (sin doble conteo). Regla: generar recurrentes solo de **julio 2026 en adelante**
+- **Subs anuales (Google One, Amazon Prime):** se reconocen como cuota mensual (anual/12) vía recurrente. El cargo anual real ya anotado se convirtió a su cuota mensual. ⚠️ **Cuando el cargo anual real vuelva a caer en el banco, NO anotarlo** — el recurrente ya lo cubre; anotarlo duplicaría (~2× la sub al año)
 - Reembolsos (bizum recibido) se registran como ajuste negativo en `Varios` (decisión: no construir split-tracking; si crece → Firefly III)
+- **Fechas en formato mixto** en la DB: csv con microsegundos (`...00:00:00.000000`), import sin ellos (`...00:00:00`), bot tz-aware (`...+00:00`). `_month_range` devuelve **bounds string** (no `datetime`) para comparar bien con los tres — con bound `datetime` se caían los gastos del día 1 a medianoche (ver `service.py`). No volver a tz-aware ahí
 - Telegram parser detects "description amount" or "amount description" pattern, infers category by keywords
 - Import source values: `telegram`, `manual`, `import`, `recurring`, `csv` (Coda)
 - API prefix: `/api/finance` (categories, expenses, summary, evolution, months, import)
