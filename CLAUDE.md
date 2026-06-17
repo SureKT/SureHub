@@ -72,10 +72,12 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 ## Estado actual del módulo Finanzas
 - Modelos: `Category` (name, type, monthly_estimate, active) + `Expense` (category_id FK, amount, description, date, source) + `RecurringExpense` (name, amount, category_id, day, active)
 - `Category.active`: soft delete — inactive categories hidden in UI but historical expenses keep FK
-- Inactive categories: Anillo, Ahorros (historical data from Coda)
-- 482 historical expenses imported from Coda (June 2025 → March 2026)
+- Inactive categories (soft delete): Anillo, Ahorros (Coda), Luz, Agua (no se pagan ahora), Netflix/Spotify/Google One/Amazon Prime (fusionadas en `Suscripciones`)
+- 482 historical expenses from Coda (June 2025 → March 2026) + 152 backfill bancario ING (`source=import`, 28 mar → 17 jun 2026, script `scripts/classify_bank_marzo.py`). Total ~634
+- Coste fijo = módulo recurrente (single source): Vodafone, Gimnasio, Médicos Sin Fronteras, Spotify, Claude (mensuales) + Google One, Amazon Prime (anuales **prorrateados** = anual/12). Filas fijas del backfill están enlazadas vía `recurring_id` para que `generate_recurring` las salte (sin doble conteo). Regla: generar recurrentes solo de **julio 2026 en adelante**
+- Reembolsos (bizum recibido) se registran como ajuste negativo en `Varios` (decisión: no construir split-tracking; si crece → Firefly III)
 - Telegram parser detects "description amount" or "amount description" pattern, infers category by keywords
-- Import source values: `telegram`, `manual`, `import`, `recurring`
+- Import source values: `telegram`, `manual`, `import`, `recurring`, `csv` (Coda)
 - API prefix: `/api/finance` (categories, expenses, summary, evolution, months, import)
 - Ports: backend 8001, frontend 5174
 
