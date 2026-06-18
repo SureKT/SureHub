@@ -26,6 +26,8 @@ HELP = (
     "*Notas (Obsidian)*\n"
     "/nota — guardar nota con tags IA\n"
     "/note — alias de /nota\n\n"
+    "*Inbox*\n"
+    "/inbox — procesar notas pendientes (digest)\n\n"
     "*Memoria del bot*\n"
     "/recuerda — guardar un hecho\n"
     "/memoria — ver memoria guardada\n"
@@ -41,6 +43,7 @@ def bot_commands() -> list[BotCommand]:
         BotCommand("mes", "Resumen del mes"),
         BotCommand("stats", "Estadísticas rápidas"),
         BotCommand("nota", "Guardar nota en Obsidian"),
+        BotCommand("inbox", "Procesar inbox de notas"),
         BotCommand("recuerda", "Guardar en memoria del bot"),
         BotCommand("memoria", "Ver memoria"),
         BotCommand("analisis", "Análisis IA de finanzas"),

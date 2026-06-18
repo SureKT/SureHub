@@ -1,4 +1,6 @@
 import logging
+from datetime import time as dtime
+from zoneinfo import ZoneInfo
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 from app.config import settings
@@ -22,6 +24,7 @@ from bot.handlers import (
     callback_borrar, callback_categoria, cmd_mes, cmd_categorias, cmd_recuerda, cmd_memoria,
     cmd_olvidar, cmd_stats, cmd_generar, cmd_analisis, cmd_nota,
 )
+from bot.inbox_handlers import cmd_inbox, callback_inbox, inbox_digest_job
 
 
 async def post_init(app):
@@ -54,8 +57,10 @@ def main():
     app.add_handler(CommandHandler("analisis", cmd_analisis))
     app.add_handler(CommandHandler("nota", cmd_nota))
     app.add_handler(CommandHandler("note", cmd_nota))
+    app.add_handler(CommandHandler("inbox", cmd_inbox))
     app.add_handler(CallbackQueryHandler(callback_borrar, pattern="^borrar:"))
     app.add_handler(CallbackQueryHandler(callback_categoria, pattern="^cat:"))
+    app.add_handler(CallbackQueryHandler(callback_inbox, pattern="^inbox:"))
     app.add_handler(MessageHandler(filters.VOICE, voice_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message))
     # Catch-all para media no soportada (foto, documento, sticker…): registrado al
@@ -66,6 +71,11 @@ def main():
     ))
 
     app.add_error_handler(on_error)
+
+    app.job_queue.run_daily(
+        inbox_digest_job,
+        time=dtime(hour=settings.INBOX_DIGEST_HOUR, tzinfo=ZoneInfo(settings.TIMEZONE)),
+    )
 
     logger.info("Bot arrancado en modo polling...")
     # allowed_updates explícito: Telegram persiste el set entre llamadas a getUpdates;
