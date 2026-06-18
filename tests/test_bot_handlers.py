@@ -330,17 +330,38 @@ class TestOtherCommands:
         assert "Ocio" in reply
         assert "50€/mes" in reply
 
-    async def test_analisis_uses_mocked_llm(self, session, monkeypatch):
-        from app.modules.memoria.service import save_memory
-        # never hit the real Claude API
+    async def test_analisis_asks_confirmation(self, monkeypatch):
         llm_mock = MagicMock(return_value="análisis mock")
         monkeypatch.setattr(handlers, "chat", llm_mock)
-        save_memory(session, "le gusta el pádel")
 
         update = make_update()
         await handlers.cmd_analisis(update, make_context())
 
+        llm_mock.assert_not_called()
+        reply = update.message.reply_text.call_args.args[0]
+        assert "coste" in reply.lower()
+        assert isinstance(update.message.reply_text.call_args.kwargs["reply_markup"], InlineKeyboardMarkup)
+
+    async def test_analisis_confirm_calls_llm(self, session, monkeypatch):
+        from app.modules.memoria.service import save_memory
+        llm_mock = MagicMock(return_value="análisis mock")
+        monkeypatch.setattr(handlers, "chat", llm_mock)
+        save_memory(session, "le gusta el pádel")
+
+        update, query = make_callback_update("analisis:confirm")
+        context = make_context(user_data={"pending_analisis": "¿cómo voy?"})
+        await handlers.callback_analisis(update, context)
+
         llm_mock.assert_called_once()
         memory_context = llm_mock.call_args.args[1]
         assert "le gusta el pádel" in memory_context
-        assert update.message.reply_text.call_args.args[0] == "análisis mock"
+        assert llm_mock.call_args.args[0] == "¿cómo voy?"
+        update.message.reply_text.assert_called_once_with("análisis mock", parse_mode="Markdown")
+
+    async def test_analisis_cancel(self):
+        update, query = make_callback_update("analisis:cancel")
+        context = make_context(user_data={"pending_analisis": "pregunta"})
+        await handlers.callback_analisis(update, context)
+
+        assert context.user_data == {}
+        assert "Cancelado" in query.edit_message_text.call_args.args[0]

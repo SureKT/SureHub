@@ -21,7 +21,7 @@ import app.models  # noqa: F401 — registers all models before create_db
 from bot.help_text import bot_commands
 from bot.handlers import (
     start, cmd_help, message, voice_message, unsupported_message, cmd_gastos, cmd_borrar,
-    callback_borrar, callback_categoria, cmd_mes, cmd_categorias, cmd_analisis, cmd_nota,
+    callback_borrar, callback_categoria, callback_analisis, cmd_mes, cmd_categorias, cmd_analisis, cmd_nota,
 )
 from bot.inbox_handlers import cmd_inbox, callback_inbox, inbox_digest_job
 
@@ -49,6 +49,7 @@ def main():
     app.add_handler(CommandHandler("mes", cmd_mes))
     app.add_handler(CommandHandler("categorias", cmd_categorias))
     app.add_handler(CommandHandler("analisis", cmd_analisis))
+    app.add_handler(CallbackQueryHandler(callback_analisis, pattern="^analisis:"))
     app.add_handler(CommandHandler("nota", cmd_nota))
     app.add_handler(CommandHandler("note", cmd_nota))
     app.add_handler(CommandHandler("inbox", cmd_inbox))

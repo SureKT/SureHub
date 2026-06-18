@@ -328,18 +328,50 @@ async def cmd_nota(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _save_and_reply_note(update, text)
 
 
+DEFAULT_ANALISIS_QUESTION = (
+    "Analiza mis gastos de este mes. ¿En qué destaco positiva o negativamente? ¿Algún consejo concreto?"
+)
+
+
 async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    question = " ".join(context.args).strip() if context.args else ""
+    question = " ".join(context.args).strip() if context.args else DEFAULT_ANALISIS_QUESTION
+    context.user_data["pending_analisis"] = question
+    preview = question if len(question) <= 120 else question[:117] + "…"
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✓ Analizar", callback_data="analisis:confirm"),
+        InlineKeyboardButton("✕ Cancelar", callback_data="analisis:cancel"),
+    ]])
+    await safe_reply(update,
+        "*Análisis IA* (Claude Sonnet, tiene coste)\n\n"
+        f"_{preview}_\n\n"
+        "¿Continuar?",
+        parse_mode="Markdown",
+        reply_markup=keyboard,
+    )
+
+
+async def callback_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "analisis:cancel":
+        context.user_data.pop("pending_analisis", None)
+        await _edit_or_send(update, query, "Cancelado.")
+        return
+
+    question = context.user_data.pop("pending_analisis", None)
     if not question:
-        question = "Analiza mis gastos de este mes. ¿En qué destaco positiva o negativamente? ¿Algún consejo concreto?"
+        await _edit_or_send(update, query, "Expirado. Vuelve a lanzar /analisis.")
+        return
+
+    await query.edit_message_text("Analizando…")
     with Session(engine) as session:
         memory_context = build_context(session)
         finance_context = _build_finance_context(session)
-    await update.message.reply_chat_action("typing")
     response = await asyncio.to_thread(chat, question, memory_context, finance_context)
-    await safe_reply(update,response, parse_mode="Markdown")
+    await safe_reply(update, response, parse_mode="Markdown")
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):

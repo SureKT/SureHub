@@ -18,7 +18,7 @@ HELP = (
     "/gastos — últimos gastos (o `/gastos mes`)\n"
     "/mes — resumen del mes y variación vs anterior\n"
     "/borrar — eliminar gasto por id\n"
-    "/analisis — análisis IA (opcional: pregunta)\n\n"
+    "/analisis — análisis IA con confirmación (tiene coste)\n\n"
     "*Inbox*\n"
     "/inbox — procesar notas pendientes (digest)\n\n"
     "/start — mensaje de bienvenida"
@@ -31,5 +31,4 @@ def bot_commands() -> list[BotCommand]:
         BotCommand("mes", "Resumen del mes"),
         BotCommand("gastos", "Últimos gastos"),
         BotCommand("inbox", "Procesar inbox de notas"),
-        BotCommand("analisis", "Análisis IA de finanzas"),
     ]
