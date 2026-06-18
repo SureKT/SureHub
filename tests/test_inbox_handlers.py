@@ -148,3 +148,21 @@ async def test_callback_edit_prompts_for_text(monkeypatch, tmp_path, session):
 
     assert context.user_data["inbox_edit_id"] == item.id
     assert "texto" in query.edit_message_text.call_args.args[0].lower()
+
+
+async def test_apply_edited_task(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    _write(tmp_path, "a.md")
+    item = scan_inbox(session, tmp_path, lambda p: '{"category":"uncertain","proposed_text":"x"}')[0]
+
+    update = make_update()
+    handled = await ih.apply_edited_task(update, item.id, "comprar pan corregido")
+
+    assert handled is True
+    assert "- [ ] comprar pan corregido" in (tmp_path / "Tareas.md").read_text(encoding="utf-8")
+
+
+async def test_apply_edited_task_unknown_id(monkeypatch, tmp_path):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    update = make_update()
+    assert await ih.apply_edited_task(update, 9999, "x") is False

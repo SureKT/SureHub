@@ -429,6 +429,11 @@ async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
+    edit_id = context.user_data.pop("inbox_edit_id", None)
+    if edit_id is not None:
+        from bot.inbox_handlers import apply_edited_task
+        if await apply_edited_task(update, edit_id, update.message.text.strip()):
+            return
     text = update.message.text
 
     parsed = parse_expense(text)

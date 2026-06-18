@@ -108,3 +108,15 @@ async def callback_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     labels = {"task": "✓ Tarea creada", "note": "📄 Archivada", "discard": "✗ Descartada"}
     await _edit_or_send(update, query, labels.get(action, "Hecho."))
+
+
+async def apply_edited_task(update: Update, item_id: int, text: str) -> bool:
+    """Applies `text` as the task for a pending item. Returns False if the item
+    no longer exists / isn't pending (caller should fall through to normal handling)."""
+    with Session(engine) as session:
+        item = get_item(session, item_id)
+        if not item or item.status != "pending":
+            return False
+        apply_item(session, item, settings.OBSIDIAN_VAULT_PATH, "task", override_text=text)
+    await safe_reply(update, f"✓ Tarea creada: {text}")
+    return True
