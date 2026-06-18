@@ -44,3 +44,59 @@ def test_build_digest_groups_confident_and_uncertain(session, tmp_path):
     datas = [b.callback_data for row in uncertain_kb.inline_keyboard for b in row]
     assert any(d.startswith("inbox:task:") for d in datas)
     assert any(d.startswith("inbox:edit:") for d in datas)
+
+
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+
+ALLOWED_USER_ID = 111
+
+
+@pytest.fixture(autouse=True)
+def inbox_engine(engine, monkeypatch):
+    monkeypatch.setattr(ih, "engine", engine)
+    return engine
+
+
+def make_update(user_id=ALLOWED_USER_ID):
+    update = MagicMock()
+    update.effective_user.id = user_id
+    update.message.reply_text = AsyncMock()
+    update.message.reply_chat_action = AsyncMock()
+    return update
+
+
+def make_context():
+    ctx = MagicMock()
+    ctx.args = []
+    ctx.user_data = {}
+    return ctx
+
+
+async def test_cmd_inbox_empty_says_clean(monkeypatch, tmp_path):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    update = make_update()
+
+    await ih.cmd_inbox(update, make_context())
+
+    assert "limpia" in update.message.reply_text.call_args.args[0].lower()
+
+
+async def test_cmd_inbox_sends_digest(monkeypatch, tmp_path):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    monkeypatch.setattr(ih, "complete_tags", lambda p: '{"category":"task","proposed_text":"comprar pan"}')
+    _write(tmp_path, "a.md")
+    update = make_update()
+
+    await ih.cmd_inbox(update, make_context())
+
+    # at least one digest message sent containing the proposed task
+    sent = " ".join(c.args[0] for c in update.message.reply_text.call_args_list)
+    assert "comprar pan" in sent
+
+
+async def test_cmd_inbox_unauthorized_ignored(tmp_path):
+    update = make_update(user_id=999)
+    await ih.cmd_inbox(update, make_context())
+    update.message.reply_text.assert_not_called()
