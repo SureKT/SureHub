@@ -48,12 +48,13 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Sin comentarios obvios — solo si el WHY no es evidente
 - Migraciones de DB: SQLite soporta ALTER TABLE ADD COLUMN sin perder datos. Para cambios mayores, script en `scripts/`
 
-## Commits
-- Ejecutar commit automáticamente (sin pedir permiso) cuando:
-  - El usuario confirma que algo funciona ("funciona", "listo", "perfecto", "ok")
-  - Y hay cambios suficientes (feature completa, fix real, módulo nuevo)
-- NO commitear por cambios triviales (un typo, un print de debug, ajuste de texto)
-- Mensajes en inglés, formato: `<tipo>: <qué> + detalle en body si aplica`
+## Commits y deploy
+- Al **cerrar una feature o fix** (tests OK, usuario confirma o scope claro): **commit + push a `main` sin pedir permiso**
+- También al confirmar explícitamente ("funciona", "listo", "perfecto", "ok", "perfecto")
+- Push dispara CI → deploy automático al server (`surehub-home`) si CI pasa
+- NO commitear cambios triviales (typo, print de debug, ajuste de texto suelto)
+- NO push si el usuario pide esperar o hay secretos en el diff
+- Mensajes en inglés, formato: `<tipo>: <qué>` + body si el why no es obvio
 - Tipos: `feat`, `fix`, `refactor`, `chore`
 
 ## Decisiones de arquitectura

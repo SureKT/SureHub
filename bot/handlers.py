@@ -14,9 +14,8 @@ from app.modules.finanzas.parser import parse_expense
 from app.modules.finanzas.service import (
     register_expense, latest_expenses, month_total,
     month_summary, find_category, list_categories, get_expenses_filtered,
-    generate_recurring,
 )
-from app.modules.memoria.service import save_memory, list_memories, delete_memory, build_context
+from app.modules.memoria.service import build_context
 from app.modules.notes.service import create_note, extract_tags
 from app.services.transcribe import transcribe
 from bot.help_text import HELP, WELCOME
@@ -260,22 +259,38 @@ async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def cmd_mes(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
+    now = datetime.now(timezone.utc)
     with Session(engine) as session:
         summary = month_summary(session)
         total = month_total(session)
+        prev_month = now.month - 1 or 12
+        prev_year = now.year if now.month > 1 else now.year - 1
+        prev_total = month_total(session, prev_year, prev_month)
 
     if not summary:
         await safe_reply(update,"Sin categorías. Configúralas desde el dashboard.")
         return
 
+    month_name = MONTHS_ES[now.month - 1].capitalize()
+    lines = [f"*{month_name} {now.year}*"]
+
+    if prev_total > 0:
+        pct = ((total - prev_total) / prev_total) * 100
+        sign = "+" if pct >= 0 else ""
+        arrow = "▲" if pct > 5 else ("▼" if pct < -5 else "→")
+        lines.append(f"{arrow} {sign}{pct:.0f}% vs {MONTHS_ES[prev_month - 1]}")
+
+    alerts = [r for r in summary if r["alert"]]
+    if alerts:
+        lines.append(f"⚠ Sobre presupuesto: {', '.join(a['name'] for a in alerts)}")
+
     variable = [r for r in summary if r["type"] == "variable" and (r["total"] > 0 or r["estimate"] > 0)]
     fixed = [r for r in summary if r["type"] == "fixed" and (r["total"] > 0 or r["estimate"] > 0)]
 
-    lines = []
     for section, items in [("Variable", variable), ("Fijo", fixed)]:
         if not items:
             continue
-        lines.append(f"*{section}*")
+        lines.append(f"\n*{section}*")
         for r in items:
             alert = " ⚠" if r["alert"] else ""
             bar = _bar(r["total"], r["estimate"])
@@ -303,48 +318,6 @@ async def cmd_categorias(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_reply(update,"\n".join(lines), parse_mode="Markdown")
 
 
-async def cmd_recuerda(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not allowed(update):
-        return
-    fact = " ".join(context.args).strip()
-    if not fact:
-        await safe_reply(update,"Uso: /recuerda <hecho>")
-        return
-    with Session(engine) as session:
-        m = save_memory(session, fact)
-        mem_id = m.id
-    await safe_reply(update,f"✓ Guardado (#{mem_id})")
-
-
-async def cmd_memoria(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not allowed(update):
-        return
-    with Session(engine) as session:
-        memories = list_memories(session)
-
-    if not memories:
-        await safe_reply(update,"Sin memoria guardada.")
-        return
-    lines = [f"`{m.id}` {m.fact}" for m in memories]
-    await safe_reply(update,"*Memoria:*\n" + "\n".join(lines), parse_mode="Markdown")
-
-
-async def cmd_olvidar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not allowed(update):
-        return
-    if not context.args:
-        await safe_reply(update,"Uso: /olvidar <id>")
-        return
-    try:
-        id_ = int(context.args[0])
-    except ValueError:
-        await safe_reply(update,"ID debe ser un número.")
-        return
-    with Session(engine) as session:
-        ok = delete_memory(session, id_)
-    await safe_reply(update,"✓ Olvidado." if ok else "No encontrado.")
-
-
 async def cmd_nota(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
@@ -353,45 +326,6 @@ async def cmd_nota(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_reply(update,"Uso: /nota <texto>\nTambién puedes escribir texto libre o `. nota` sin comando.")
         return
     await _save_and_reply_note(update, text)
-
-
-async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not allowed(update):
-        return
-    now = datetime.now(timezone.utc)
-    with Session(engine) as session:
-        total = month_total(session)
-        prev_month = now.month - 1 or 12
-        prev_year = now.year if now.month > 1 else now.year - 1
-        prev_total = month_total(session, prev_year, prev_month)
-        summary = month_summary(session)
-
-    alerts = [r for r in summary if r["alert"]]
-    active = [r for r in summary if r["total"] > 0]
-    top = max(active, key=lambda r: r["total"]) if active else None
-
-    month_name = MONTHS_ES[now.month - 1].capitalize()
-    lines = [f"*{month_name} {now.year}*"]
-
-    if prev_total > 0:
-        pct = ((total - prev_total) / prev_total) * 100
-        sign = "+" if pct >= 0 else ""
-        arrow = "▲" if pct > 5 else ("▼" if pct < -5 else "→")
-        lines.append(f"Total: *{total:.2f}€*  {arrow} {sign}{pct:.0f}% vs {MONTHS_ES[prev_month-1]}")
-    else:
-        lines.append(f"Total: *{total:.2f}€*")
-
-    if top:
-        pct_top = (top['total'] / total * 100) if total > 0 else 0
-        lines.append(f"Top: {top['name']} — {top['total']:.0f}€ ({pct_top:.0f}%)")
-
-    if alerts:
-        cats = ", ".join(a["name"] for a in alerts)
-        lines.append(f"⚠ Sobre presupuesto: {cats}")
-    else:
-        lines.append("Todos los presupuestos OK")
-
-    await safe_reply(update,"\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -406,24 +340,6 @@ async def cmd_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_chat_action("typing")
     response = await asyncio.to_thread(chat, question, memory_context, finance_context)
     await safe_reply(update,response, parse_mode="Markdown")
-
-
-async def cmd_generar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not allowed(update):
-        return
-    now = datetime.now(timezone.utc)
-    with Session(engine) as session:
-        result = generate_recurring(session, now.year, now.month)
-
-    total = result["total"]
-    if total == 0:
-        await safe_reply(update,"Todos los recurrentes ya generados este mes.")
-        return
-    lines = [f"✓ {g['name']} — {g['amount']:.2f}€" for g in result["generated"]]
-    await safe_reply(update,
-        f"*{total} gasto{'s' if total > 1 else ''} generado{'s' if total > 1 else ''}:*\n" + "\n".join(lines),
-        parse_mode="Markdown"
-    )
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -467,7 +383,7 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_reply(update,
         "No entiendo.\n"
         "• Gasto: `mercadona 44`\n"
-        "• Nota: texto libre · `. idea` · /nota texto\n"
+        "• Nota: texto libre · `. idea` · 🎤 audio\n"
         "/help — comandos",
         parse_mode="Markdown",
     )

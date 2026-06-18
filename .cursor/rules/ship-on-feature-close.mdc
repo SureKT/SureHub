@@ -1,0 +1,27 @@
+---
+description: Commit and push to main when a feature is complete so prod auto-deploys
+alwaysApply: true
+---
+
+# Ship on feature close
+
+When a feature or fix is **done** (tests pass, user confirmed or scope is clearly closed):
+
+1. **Commit** on `main` without asking — unless changes are trivial (typo, debug print).
+2. **Push** to `origin/main` immediately after commit — do not wait for a separate push request.
+3. Prod deploys automatically when CI passes on `main` (`.github/workflows/deploy.yml`).
+
+## Commit format
+
+- English, Conventional Commits: `feat`, `fix`, `refactor`, `chore`
+- Subject + body when the why isn't obvious
+
+## Skip auto-ship when
+
+- User explicitly says not to commit/push yet
+- Work is WIP or exploratory
+- Changes may contain secrets (`.env`, credentials)
+
+## After push
+
+Briefly confirm: commit hash, that push succeeded, and that deploy will run via CI.

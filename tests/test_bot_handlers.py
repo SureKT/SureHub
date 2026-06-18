@@ -8,8 +8,7 @@ from telegram.error import BadRequest
 
 import bot.handlers as handlers
 from app.modules.finanzas.models import Expense
-from app.modules.finanzas.service import create_category, create_recurring
-from app.modules.memoria.service import list_memories, save_memory
+from app.modules.finanzas.service import create_category
 
 ALLOWED_USER_ID = 111  # matches TELEGRAM_ALLOWED_USER_IDS set in conftest
 
@@ -214,46 +213,6 @@ class TestGastos:
         assert "cine" in reply
 
 
-class TestMemoria:
-    async def test_recuerda_saves(self, session):
-        update = make_update()
-        await handlers.cmd_recuerda(update, make_context(args=["le", "gusta", "el", "pádel"]))
-
-        memories = list_memories(session)
-        assert len(memories) == 1
-        assert memories[0].fact == "le gusta el pádel"
-        assert "✓ Guardado" in update.message.reply_text.call_args.args[0]
-
-    async def test_recuerda_without_args(self, session):
-        update = make_update()
-        await handlers.cmd_recuerda(update, make_context())
-        assert "Uso: /recuerda" in update.message.reply_text.call_args.args[0]
-        assert list_memories(session) == []
-
-    async def test_memoria_lists(self, session):
-        save_memory(session, "vive en Valencia")
-        update = make_update()
-        await handlers.cmd_memoria(update, make_context())
-        assert "vive en Valencia" in update.message.reply_text.call_args.args[0]
-
-    async def test_memoria_empty(self):
-        update = make_update()
-        await handlers.cmd_memoria(update, make_context())
-        assert "Sin memoria" in update.message.reply_text.call_args.args[0]
-
-    async def test_olvidar(self, session):
-        m = save_memory(session, "borrable")
-        update = make_update()
-        await handlers.cmd_olvidar(update, make_context(args=[str(m.id)]))
-        assert "Olvidado" in update.message.reply_text.call_args.args[0]
-        assert list_memories(session) == []
-
-    async def test_olvidar_missing(self):
-        update = make_update()
-        await handlers.cmd_olvidar(update, make_context(args=["999"]))
-        assert "No encontrado" in update.message.reply_text.call_args.args[0]
-
-
 class TestVoiceMessage:
     async def test_voice_transcribed_and_saved(self, monkeypatch, tmp_path):
         monkeypatch.setattr(handlers.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
@@ -355,7 +314,8 @@ class TestOtherCommands:
         await handlers.cmd_help(update, make_context())
         reply = update.message.reply_text.call_args.args[0]
         assert "/gastos" in reply
-        assert "/nota" in reply
+        assert "/inbox" in reply
+        assert "/recuerda" not in reply
 
     async def test_mes_without_categories(self):
         update = make_update()
@@ -370,15 +330,8 @@ class TestOtherCommands:
         assert "Ocio" in reply
         assert "50€/mes" in reply
 
-    async def test_generar_creates_recurring(self, session):
-        create_recurring(session, "Netflix", 12.99)
-        update = make_update()
-        await handlers.cmd_generar(update, make_context())
-        reply = update.message.reply_text.call_args.args[0]
-        assert "Netflix" in reply
-        assert "generado" in reply
-
     async def test_analisis_uses_mocked_llm(self, session, monkeypatch):
+        from app.modules.memoria.service import save_memory
         # never hit the real Claude API
         llm_mock = MagicMock(return_value="análisis mock")
         monkeypatch.setattr(handlers, "chat", llm_mock)
