@@ -19,8 +19,10 @@ app/
   models.py       # imports all models (for create_db)
   main.py         # FastAPI app
 bot/
-  handlers.py     # Telegram handlers
-  run.py          # bot entrypoint (calls create_db on start)
+  handlers.py         # Telegram handlers
+  inbox_handlers.py   # /inbox digest + callbacks + job diario
+  help_text.py        # /help y menú de comandos
+  run.py              # bot entrypoint (calls create_db on start)
 frontend/         # React + Vite, proxy /api → localhost:8001
 scripts/          # one-off migration and seed scripts
 docs/             # architecture and specs

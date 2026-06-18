@@ -31,6 +31,8 @@ app/
   main.py        # FastAPI app
 bot/
   handlers.py    # handlers de Telegram
+  inbox_handlers.py  # /inbox, digest, callbacks, job diario
+  help_text.py   # /help y menú de comandos
   run.py         # arranque del bot (llama a create_db al inicio)
 frontend/        # React + Vite, proxy /api → localhost:8001
 scripts/         # scripts de migración y seed (uso puntual, no producción)
@@ -63,6 +65,18 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - No hay historial de conversación en el bot — cada mensaje es independiente (decisión consciente, añadir si el uso real lo justifica)
 - Memoria del bot: manual vía /recuerda. Se inyecta en system prompt de Claude
 - Frontend consume API en /api (proxy Vite → FastAPI). En prod, mismo origen
+
+## Estado actual del módulo Inbox (Obsidian)
+
+- Módulo `app/modules/inbox/` + handlers en `bot/inbox_handlers.py`
+- Modelo `InboxItem` en SQLite (`inbox_items`): trackea cada `.md` visto en `inbox/` + propuesta IA + estado
+- Clasificación Haiku vía `complete_tags` → `task` | `note` | `uncertain` (fallo LLM → `uncertain`, nunca se pierde la nota)
+- Comando `/inbox`: escanea notas nuevas, envía digest Telegram con aprobación en lote
+- Digest diario: `JobQueue.run_daily` a las `INBOX_DIGEST_HOUR` (default 9, `TIMEZONE`)
+- Acciones reversibles (mover `.md`): `task` → línea en `Tareas.md` + `archivo/`; `note` → `archivo/`; `discard` → `inbox/_descartado/`
+- Notas `uncertain` (o voz 🎤): botones individuales + flujo editar (siguiente mensaje de texto)
+- Spec: `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`
+- Fase 2 pendiente: eventos → Google Calendar (OAuth)
 
 ## Estado actual del módulo Finanzas
 - Modelos: `Category` (name, type, monthly_estimate, active) + `Expense` (category_id FK, amount, description, date, source) + `RecurringExpense` (name, amount, category_id, day, active)

@@ -6,11 +6,16 @@ La sesión de Claude Code (server, Remote Control) mantiene este fichero: pedir
 
 ## En curso
 
-- [ ] Procesado de inbox **Fase 1** (clasificación + digest + tareas→Obsidian) — en implementación.
-  Fase 2 (eventos→Google Calendar) pendiente. Spec: `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`.
+(vacío)
 
 ## Pendiente
 
+- [ ] **Inbox Fase 2** — eventos con fecha/hora → Google Calendar (OAuth). Spec aparte.
+
 ## Hecho
+
+- [x] **Inbox Fase 1** (2026-06-18) — clasificación IA + digest Telegram + tareas→`Tareas.md` +
+  archivado. Comando `/inbox`, job diario `INBOX_DIGEST_HOUR`. Spec:
+  `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`.
 
 `git log` es el registro completo. Aquí solo hitos si hace falta contexto.
