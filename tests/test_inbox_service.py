@@ -1,7 +1,7 @@
 from sqlmodel import select
 
 from app.modules.inbox.models import InboxItem
-from app.modules.inbox.service import classify_note
+from app.modules.inbox.service import classify_note, scan_inbox
 
 
 def test_inbox_item_persists(session):
@@ -42,3 +42,48 @@ def test_classify_llm_failure_is_uncertain():
 def test_classify_non_json_is_uncertain():
     llm = lambda prompt: "no soy json"
     assert classify_note("algo", llm)[0] == "uncertain"
+
+
+NOTE = """---
+created: 2026-06-18T10:00:00+02:00
+tags: [compras]
+source: telegram-voice
+---
+
+tengo que comprar pan y leche
+"""
+
+
+def _write_note(vault, name, content=NOTE):
+    inbox = vault / "inbox"
+    inbox.mkdir(parents=True, exist_ok=True)
+    (inbox / name).write_text(content, encoding="utf-8")
+
+
+def test_scan_creates_items_for_new_notes(session, tmp_path):
+    _write_note(tmp_path, "2026-06-18-1000-pan.md")
+    llm = lambda prompt: '{"category": "task", "proposed_text": "comprar pan y leche"}'
+
+    created = scan_inbox(session, tmp_path, llm)
+
+    assert len(created) == 1
+    item = created[0]
+    assert item.filename == "2026-06-18-1000-pan.md"
+    assert item.category == "task"
+    assert item.proposed_text == "comprar pan y leche"
+    assert item.source == "telegram-voice"
+    assert item.status == "pending"
+
+
+def test_scan_skips_already_seen(session, tmp_path):
+    _write_note(tmp_path, "2026-06-18-1000-pan.md")
+    llm = lambda prompt: '{"category": "task", "proposed_text": "x"}'
+
+    scan_inbox(session, tmp_path, llm)
+    created_again = scan_inbox(session, tmp_path, llm)
+
+    assert created_again == []
+
+
+def test_scan_no_inbox_dir_returns_empty(session, tmp_path):
+    assert scan_inbox(session, tmp_path, lambda p: "{}") == []
