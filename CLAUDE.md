@@ -6,7 +6,7 @@ Stack: FastAPI + SQLModel + SQLite + Telegram bot + Claude API.
 
 > **Contexto de infra:** SureHub es la pieza custom de un proyecto mayor (homelab self-hosted, Bloque A). El estado de la infra y el server viven en el repo `SureKT/homelab` (`CLAUDE.md` + `STATE.md`). Para trabajo de infra/servidor, ese repo es la fuente de verdad. Convención: pull al empezar, actualiza estado y push al cambiar algo.
 
-> **Roadmap ("no reinventar la rueda"):** SureHub = **capa de captura+orquestación**, no reimplementa lo ya resuelto. Core propio: bot Telegram, memoria del bot, finanzas mínimo. NO construir: Diario (→ Obsidian, módulo retirado), Notas (→ vault Obsidian, solo handler bot), índice/búsqueda IA (→ Khoj). Finanzas: si piden presupuestos/reglas/multi-cuenta → Firefly III. Detalle/estado en `SureKT/homelab` → `STATE.md`.
+> **Roadmap ("no reinventar la rueda"):** SureHub = **capa de captura+orquestación**, no reimplementa lo ya resuelto. Core propio: bot Telegram, finanzas mínimo. NO construir: Diario (→ Obsidian, módulo retirado), Notas (→ vault Obsidian, captura sin comando), índice/búsqueda IA (→ Khoj). Memoria del bot: solo dashboard web (sin chat conversacional). Finanzas: si piden presupuestos/reglas/multi-cuenta → Firefly III. Detalle/estado en `SureKT/homelab` → `STATE.md`.
 
 ## Comandos
 - Backend: `uvicorn app.main:app --reload` (desde raíz, venv activado)
@@ -47,6 +47,7 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Variables de entorno: siempre en `.env`, nunca hardcodeadas, documentar en `.env.example`
 - Sin comentarios obvios — solo si el WHY no es evidente
 - Migraciones de DB: SQLite soporta ALTER TABLE ADD COLUMN sin perder datos. Para cambios mayores, script en `scripts/`
+- **Documentación:** si cambia comportamiento visible (bot, API, módulos, env vars, infra), actualizar `CLAUDE.md` y lo que aplique (`docs/architecture.md`, `.env.example`) en el mismo commit — no cerrar features con docs obsoletas
 
 ## Commits y deploy
 - Al **cerrar una feature o fix** (tests OK, usuario confirma o scope claro): **commit + push a `main` sin pedir permiso**
@@ -64,8 +65,29 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Bot y FastAPI corren como procesos separados en local, containers separados en prod (api/bot/frontend vía docker compose en el server)
 - Claude API model: `claude-sonnet-4-6` — cambiar solo si hay razón explícita
 - No hay historial de conversación en el bot — cada mensaje es independiente (decisión consciente, añadir si el uso real lo justifica)
-- Memoria del bot: manual vía /recuerda. Se inyecta en system prompt de Claude
+- Memoria del bot: módulo SQLite + pantalla Memory en frontend. Ya no hay comandos Telegram; se inyecta solo en `/analisis` si hay hechos guardados
 - Frontend consume API en /api (proxy Vite → FastAPI). En prod, mismo origen
+
+## Bot Telegram
+
+**Filosofía:** captura sin comando primero. Menú de autocompletado `/` mínimo (4 entradas).
+
+**Menú** (`bot_commands()` en `help_text.py`): `help`, `mes`, `gastos`, `inbox`
+
+**Captura sin comando**
+- Gasto: `descripción cantidad` o `cantidad descripción` → categoría por keywords o botones inline
+- Nota: texto libre (≥2 palabras), prefijo `. idea`, audio 🎤 → `{vault}/inbox/*.md`
+- Comandos ocultos del menú (siguen activos): `/nota`, `/note`, `/borrar`, `/categorias`, `/start`, `/ayuda`
+
+**Consultas y acciones**
+- `/mes` — resumen variable/fijo, variación vs mes anterior, alertas de presupuesto (absorbe el antiguo `/stats`)
+- `/gastos` — últimos 10, o `/gastos mes`
+- `/inbox` — escaneo + digest con botones; job diario a `INBOX_DIGEST_HOUR`
+- `/analisis` — Claude Sonnet sobre finanzas del mes; **confirmación obligatoria** (inline) antes de llamar a la API; fuera del menú por coste
+
+**Retirado del bot:** `/recuerda`, `/memoria`, `/olvidar`, `/generar`, `/stats`
+
+**Obsidian:** todo pasa por `OBSIDIAN_VAULT_PATH`. Rutas: `inbox/`, `archivo/`, `inbox/_descartado/`, `Tareas.md`. Si mueves el vault: actualizar `.env` en prod, volumen Docker en homelab, reiniciar contenedor bot.
 
 ## Estado actual del módulo Inbox (Obsidian)
 
@@ -88,6 +110,7 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - **Fechas en formato mixto** en la DB: csv con microsegundos (`...00:00:00.000000`), import sin ellos (`...00:00:00`), bot tz-aware (`...+00:00`). `_month_range` devuelve **bounds string** (no `datetime`) para comparar bien con los tres — con bound `datetime` se caían los gastos del día 1 a medianoche (ver `service.py`). No volver a tz-aware ahí
 - Telegram parser detects "description amount" or "amount description" pattern, infers category by keywords
 - Import source values: `telegram`, `manual`, `import`, `recurring`, `csv` (Coda)
+- Gastos recurrentes: `generate_recurring()` vía API `/api/recurrentes/generate` o frontend — no hay `/generar` en Telegram
 - API prefix: `/api/finance` (categories, expenses, summary, evolution, months, import)
 - Ports: backend 8001, frontend 5174
 

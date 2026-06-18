@@ -1,0 +1,20 @@
+---
+description: Keep CLAUDE.md and related docs in sync when behavior changes
+alwaysApply: true
+---
+
+# Update docs on relevant changes
+
+When shipping a feature, fix, or refactor that changes **observable behavior**, include doc updates in the same commit:
+
+| Change | Update |
+|--------|--------|
+| Bot commands, capture flow, inbox | `CLAUDE.md` § Bot Telegram |
+| New/removed env vars | `.env.example` + `CLAUDE.md` if non-obvious |
+| API endpoints, module behavior | `CLAUDE.md` module section |
+| Architecture decisions | `docs/architecture.md` |
+| Infra/deploy | `CLAUDE.md` § Infraestructura (+ homelab repo if server-side) |
+
+`CLAUDE.md` is the living source of truth for current state. `docs/architecture.md` is reference for decisions and conventions.
+
+Skip doc updates only for pure internals with no user-facing or operator-facing impact.

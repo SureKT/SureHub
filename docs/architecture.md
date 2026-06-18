@@ -1,6 +1,6 @@
 # Architecture & Development Reference
 
-Internal reference for decisions, conventions, and structure.
+Internal reference for decisions, conventions, and structure. For current module state and bot commands, **`CLAUDE.md` is the source of truth**.
 
 ## Project Structure
 
@@ -19,9 +19,9 @@ app/
   models.py       # imports all models (for create_db)
   main.py         # FastAPI app
 bot/
-  handlers.py         # Telegram handlers
-  inbox_handlers.py   # /inbox digest + callbacks + job diario
-  help_text.py        # /help y menú de comandos
+  handlers.py         # Telegram handlers (capture, finance, analisis)
+  inbox_handlers.py   # /inbox digest + callbacks + daily job
+  help_text.py        # /help + Telegram command menu (bot_commands)
   run.py              # bot entrypoint (calls create_db on start)
 frontend/         # React + Vite, proxy /api → localhost:8001
 scripts/          # one-off migration and seed scripts
@@ -30,17 +30,23 @@ docs/             # architecture and specs
 
 ## Architecture Decisions
 
-**SQLite in dev, PostgreSQL in prod** — swap via `DATABASE_URL` only. No code changes needed.
+**SQLite in local and prod** — canonical DB on homelab volume `/srv/surehub/data/surehub.db`. `DATABASE_URL` only.
 
-**Telegram polling in dev, webhook in prod** — swap via `TELEGRAM_MODE`. Bot and FastAPI run as separate processes locally, same container in prod.
+**Telegram polling in dev, webhook in prod** — swap via `TELEGRAM_MODE`. Bot and FastAPI run as separate processes locally, separate containers in prod.
 
-**No conversation history in bot** — each message is independent. Deliberate choice; add only if real usage justifies it.
+**No conversation history in bot** — each message is independent. Text/voice either parses as expense/note or gets "No entiendo". No free-form chat.
 
-**Manual memory via `/recuerda`** — injected into Claude system prompt. Simple, controllable.
+**Bot is capture-first** — Telegram command menu is minimal (`help`, `mes`, `gastos`, `inbox`). Notes and expenses work without commands.
 
-**Claude model: `claude-sonnet-4-6`** — change only with explicit reason.
+**Memory module** — SQLite + frontend UI only. Injected into `/analisis` if facts exist. No `/recuerda` in Telegram.
 
-**Single user, no auth** — SureHub is personal. No multi-user support planned.
+**`/analisis` requires confirmation** — inline buttons before Claude Sonnet runs (cost control). Not in Telegram menu.
+
+**Obsidian vault** — `OBSIDIAN_VAULT_PATH`. Bot writes `inbox/*.md`; inbox module moves to `archivo/` or `_descartado/`. Moving the vault requires updating env + Docker mount on server.
+
+**Claude models** — Sonnet (`LLM_MODEL`) for `/analisis`; Haiku (`TAG_MODEL`) for note tags and inbox classification.
+
+**Single user, no auth** — personal use only.
 
 **Frontend proxy** — Vite proxies `/api` → FastAPI in dev. Same origin in prod.
 
@@ -52,18 +58,17 @@ docs/             # architecture and specs
 4. Register router in `app/main.py`
 5. Add frontend view in `frontend/src/components/`
 6. Add nav entry in `frontend/src/components/Sidebar.jsx`
+7. Update `CLAUDE.md` (and this file if the decision is architectural)
 
 ## DB Migrations
 
 SQLite supports `ALTER TABLE ADD COLUMN` without data loss. For bigger changes, write a script in `scripts/` and run once.
 
-## Commits
+## Commits, deploy, and docs
 
-Format: `<type>: <what>` with body if needed.
-Types: `feat`, `fix`, `refactor`, `chore`
-Language: English.
-
-Auto-commit when user confirms something works ("funciona", "listo", "perfecto", "ok") and changes are substantial enough.
+- Format: `<type>: <what>` — English, types `feat` | `fix` | `refactor` | `chore`
+- On feature close (tests OK, user confirms): commit + push to `main` → CI → auto-deploy to `surehub-home`
+- **Update docs in the same commit** when behavior changes: `CLAUDE.md`, `docs/architecture.md`, `.env.example` as applicable
 
 ## UI Design System
 
@@ -76,10 +81,3 @@ Key rules:
 - No native date pickers without full style reset
 
 **Mandatory flow for UI changes:** screenshot audit → propose in text → implement → screenshot verify.
-
-## Vision (Long-term)
-
-- Dual sidebar: left for module nav, right for module config/explore
-- Pastel aesthetic variant
-- Login + API credentials management
-- Production: Hetzner VPS, Docker, Telegram webhook, PostgreSQL

@@ -7,9 +7,10 @@ alwaysApply: true
 
 When a feature or fix is **done** (tests pass, user confirmed or scope is clearly closed):
 
-1. **Commit** on `main` without asking — unless changes are trivial (typo, debug print).
-2. **Push** to `origin/main` immediately after commit — do not wait for a separate push request.
-3. Prod deploys automatically when CI passes on `main` (`.github/workflows/deploy.yml`).
+1. **Update docs** if behavior changed — `CLAUDE.md`, `docs/architecture.md`, `.env.example` as needed.
+2. **Commit** on `main` without asking — unless changes are trivial (typo, debug print).
+3. **Push** to `origin/main` immediately after commit — do not wait for a separate push request.
+4. Prod deploys automatically when CI passes on `main` (`.github/workflows/deploy.yml`).
 
 ## Commit format
 
