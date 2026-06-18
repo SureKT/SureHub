@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     TELEGRAM_MODE: str = "polling"
     WEBHOOK_URL: str = ""
     TIMEZONE: str = "Europe/Madrid"  # hora local para timestamps de notas
+    INBOX_DIGEST_HOUR: int = 9  # hora local del digest diario de la inbox
 
     # Obsidian vault (notas .md planas, sin DB)
     OBSIDIAN_VAULT_PATH: str = "./data/obsidian"

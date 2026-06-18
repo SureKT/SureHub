@@ -120,3 +120,17 @@ async def apply_edited_task(update: Update, item_id: int, text: str) -> bool:
         apply_item(session, item, settings.OBSIDIAN_VAULT_PATH, "task", override_text=text)
     await safe_reply(update, f"✓ Tarea creada: {text}")
     return True
+
+
+async def inbox_digest_job(context: ContextTypes.DEFAULT_TYPE):
+    """Daily scheduled scan + digest. Silent when there's nothing pending."""
+    messages = await asyncio.to_thread(_scan_and_digest, settings.OBSIDIAN_VAULT_PATH)
+    if not messages:
+        return
+    chat_id = settings.allowed_user_ids[0]
+    for text, kb in messages:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=text,
+                                           parse_mode="Markdown", reply_markup=kb)
+        except Exception:
+            await context.bot.send_message(chat_id=chat_id, text=text, reply_markup=kb)

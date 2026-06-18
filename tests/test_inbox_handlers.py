@@ -166,3 +166,29 @@ async def test_apply_edited_task_unknown_id(monkeypatch, tmp_path):
     monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
     update = make_update()
     assert await ih.apply_edited_task(update, 9999, "x") is False
+
+
+async def test_inbox_digest_job_sends_to_user(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    monkeypatch.setattr(ih, "complete_tags", lambda p: '{"category":"task","proposed_text":"comprar pan"}')
+    _write(tmp_path, "a.md")
+
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    await ih.inbox_digest_job(context)
+
+    sent = " ".join(str(c.kwargs.get("text", "")) for c in context.bot.send_message.call_args_list)
+    assert "comprar pan" in sent
+    # sent to the allowed user id
+    assert context.bot.send_message.call_args.kwargs["chat_id"] == ih.settings.allowed_user_ids[0]
+
+
+async def test_inbox_digest_job_silent_when_empty(monkeypatch, tmp_path):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    context = MagicMock()
+    context.bot.send_message = AsyncMock()
+
+    await ih.inbox_digest_job(context)
+
+    context.bot.send_message.assert_not_called()
