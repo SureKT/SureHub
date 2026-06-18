@@ -100,3 +100,51 @@ async def test_cmd_inbox_unauthorized_ignored(tmp_path):
     update = make_update(user_id=999)
     await ih.cmd_inbox(update, make_context())
     update.message.reply_text.assert_not_called()
+
+
+def make_callback_update(data, user_id=ALLOWED_USER_ID):
+    update = make_update(user_id=user_id)
+    query = MagicMock()
+    query.data = data
+    query.answer = AsyncMock()
+    query.edit_message_text = AsyncMock()
+    update.callback_query = query
+    update.effective_chat.send_message = AsyncMock()
+    return update, query
+
+
+async def test_callback_apply_all(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    monkeypatch.setattr(ih, "complete_tags", lambda p: '{"category":"task","proposed_text":"comprar pan"}')
+    _write(tmp_path, "a.md")
+    scan_inbox(session, tmp_path, ih.complete_tags)
+
+    update, query = make_callback_update("inbox:applyall")
+    await ih.callback_inbox(update, make_context())
+
+    assert "- [ ] comprar pan" in (tmp_path / "Tareas.md").read_text(encoding="utf-8")
+    assert "1" in query.edit_message_text.call_args.args[0]
+
+
+async def test_callback_per_item_task(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    _write(tmp_path, "a.md")
+    item = scan_inbox(session, tmp_path, lambda p: '{"category":"uncertain","proposed_text":"comprar pan"}')[0]
+
+    update, query = make_callback_update(f"inbox:task:{item.id}")
+    await ih.callback_inbox(update, make_context())
+
+    assert "- [ ] comprar pan" in (tmp_path / "Tareas.md").read_text(encoding="utf-8")
+
+
+async def test_callback_edit_prompts_for_text(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    _write(tmp_path, "a.md")
+    item = scan_inbox(session, tmp_path, lambda p: '{"category":"uncertain","proposed_text":"x"}')[0]
+
+    update, query = make_callback_update(f"inbox:edit:{item.id}")
+    context = make_context()
+    await ih.callback_inbox(update, context)
+
+    assert context.user_data["inbox_edit_id"] == item.id
+    assert "texto" in query.edit_message_text.call_args.args[0].lower()

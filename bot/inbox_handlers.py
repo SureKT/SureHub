@@ -67,3 +67,44 @@ async def cmd_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     for text, kb in messages:
         await safe_reply(update, text, parse_mode="Markdown", reply_markup=kb)
+
+
+async def _edit_or_send(update: Update, query, text: str):
+    from telegram.error import BadRequest
+    try:
+        await query.edit_message_text(text)
+    except BadRequest:
+        await update.effective_chat.send_message(text)
+
+
+async def callback_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data  # inbox:applyall | inbox:<action>:<id>
+
+    if data == "inbox:applyall":
+        with Session(engine) as session:
+            counts = apply_suggested(session, settings.OBSIDIAN_VAULT_PATH)
+        await _edit_or_send(
+            update, query,
+            f"✓ Aplicados: {counts['task']} tarea(s), {counts['note']} nota(s) archivada(s)."
+        )
+        return
+
+    _, action, item_id_str = data.split(":")
+    item_id = int(item_id_str)
+
+    if action == "edit":
+        context.user_data["inbox_edit_id"] = item_id
+        await _edit_or_send(update, query, "Envíame el texto corregido de la tarea.")
+        return
+
+    with Session(engine) as session:
+        item = get_item(session, item_id)
+        if not item or item.status != "pending":
+            await _edit_or_send(update, query, "Ya resuelta.")
+            return
+        apply_item(session, item, settings.OBSIDIAN_VAULT_PATH, action)
+
+    labels = {"task": "✓ Tarea creada", "note": "📄 Archivada", "discard": "✗ Descartada"}
+    await _edit_or_send(update, query, labels.get(action, "Hecho."))
