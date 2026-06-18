@@ -10,10 +10,14 @@ La sesión de Claude Code (server, Remote Control) mantiene este fichero: pedir
 
 ## Pendiente
 
-- [ ] **Inbox Fase 2** — eventos con fecha/hora → Google Calendar (OAuth). Spec aparte.
+(vacío)
 
 ## Hecho
 
+- [x] **Inbox Fase 2** (2026-06-18) — eventos con fecha/hora → Google Calendar (OAuth
+  one-time). Categoría `event`, extracción Sonnet (fecha/duración/temática), color por
+  temática, tarjeta individual con editar-fecha. Spec:
+  `docs/superpowers/specs/2026-06-18-inbox-calendar-events-design.md`.
 - [x] **Inbox Fase 1** (2026-06-18) — clasificación IA + digest Telegram + tareas→`Tareas.md` +
   archivado. Comando `/inbox`, job diario `INBOX_DIGEST_HOUR`. Spec:
   `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`.

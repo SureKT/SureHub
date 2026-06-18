@@ -11,7 +11,8 @@ app/
     service.py    # business logic, receives Session
     parser.py     # input parsing (if applicable)
   services/
-    llm.py        # Claude API wrapper
+    llm.py        # Claude API wrapper (complete_tags=Haiku, complete_event=Sonnet)
+    calendar.py   # Google Calendar wrapper (OAuth token, CALENDAR_COLORS, create_event)
   routers/
     finanzas.py   # REST endpoints per module
   config.py       # Settings from .env
@@ -44,7 +45,9 @@ docs/             # architecture and specs
 
 **Obsidian vault** — `OBSIDIAN_VAULT_PATH`. Bot writes `inbox/*.md`; inbox module moves to `archivo/` or `_descartado/`. Moving the vault requires updating env + Docker mount on server.
 
-**Claude models** — Sonnet (`LLM_MODEL`) for `/analisis`; Haiku (`TAG_MODEL`) for note tags and inbox classification.
+**Claude models** — Sonnet (`LLM_MODEL`) for `/analisis` and inbox event date extraction (`extract_event`); Haiku (`TAG_MODEL`) for note tags and inbox classification.
+
+**Inbox events → Google Calendar** — notes classified as `event` get a Sonnet date/duration/theme extraction (2nd LLM call, only for events). Approval is per-event in the digest; `create_event` (`services/calendar.py`) inserts into Google Calendar with a theme color. OAuth token lives in the server volume; generated once via `scripts/google_auth.py`.
 
 **Single user, no auth** — personal use only.
 

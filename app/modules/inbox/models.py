@@ -13,6 +13,11 @@ class InboxItem(SQLModel, table=True):
     source: str = ""                                 # telegram | telegram-voice | ...
     category: str = "uncertain"                      # task | note | uncertain
     proposed_text: str = ""
-    status: str = "pending"                          # pending | approved | archived | discarded
+    event_start: Optional[str] = None    # ISO local: 'YYYY-MM-DDTHH:MM:SS' o 'YYYY-MM-DD'
+    event_end: Optional[str] = None
+    all_day: bool = False
+    theme: str = ""                       # clave de CALENDAR_COLORS
+    calendar_event_id: Optional[str] = None
+    status: str = "pending"              # pending | approved | archived | discarded | scheduled
     created_at: datetime = Field(default_factory=datetime.utcnow)
     resolved_at: Optional[datetime] = None

@@ -8,6 +8,8 @@ from app.modules.inbox.service import (
     apply_suggested,
     pending_items,
     get_item,
+    extract_event,
+    apply_event,
 )
 
 
@@ -139,6 +141,110 @@ def test_apply_discard_moves_to_descartado(session, tmp_path):
 
     assert (tmp_path / "inbox" / "_descartado" / "n.md").exists()
     assert item.status == "discarded"
+
+
+def test_inbox_item_has_event_fields(session):
+    item = InboxItem(
+        filename="ev.md", category="event", proposed_text="pádel con Marc",
+        event_start="2026-06-20T18:00:00", event_end="2026-06-20T19:30:00",
+        all_day=False, theme="padel",
+    )
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    assert item.event_start == "2026-06-20T18:00:00"
+    assert item.theme == "padel"
+    assert item.all_day is False
+    assert item.calendar_event_id is None
+
+
+def test_extract_event_timed():
+    llm = lambda p: '{"summary":"Pádel con Marc","start":"2026-06-20T18:00:00","end":"2026-06-20T19:00:00","all_day":false,"theme":"padel"}'
+    data = extract_event("pádel con Marc el viernes a las 18", "2026-06-18 (jueves)", llm)
+    assert data["summary"] == "Pádel con Marc"
+    assert data["start"] == "2026-06-20T18:00:00"
+    assert data["end"] == "2026-06-20T19:00:00"
+    assert data["all_day"] is False
+    assert data["theme"] == "padel"
+
+
+def test_extract_event_all_day_defaults_end_to_start():
+    llm = lambda p: '{"summary":"Cumple Ana","start":"2026-06-25","end":"","all_day":true,"theme":"social"}'
+    data = extract_event("cumple de Ana el 25", "2026-06-18 (jueves)", llm)
+    assert data["all_day"] is True
+    assert data["end"] == "2026-06-25"
+
+
+def test_extract_event_unknown_theme_becomes_default():
+    llm = lambda p: '{"summary":"X","start":"2026-06-25","end":"2026-06-25","all_day":true,"theme":"viaje"}'
+    assert extract_event("x", "2026-06-18", llm)["theme"] == "default"
+
+
+def test_extract_event_llm_failure_returns_none():
+    def llm(p):
+        raise RuntimeError("API down")
+    assert extract_event("x", "2026-06-18", llm) is None
+
+
+def test_extract_event_non_json_returns_none():
+    assert extract_event("x", "2026-06-18", lambda p: "no soy json") is None
+
+
+def test_extract_event_missing_start_returns_none():
+    llm = lambda p: '{"summary":"X","start":"","end":"","all_day":false,"theme":"padel"}'
+    assert extract_event("x", "2026-06-18", llm) is None
+
+
+def test_classify_event_category():
+    llm = lambda p: '{"category":"event","proposed_text":"cena con Marc"}'
+    assert classify_note("cena con Marc el viernes 21h", llm)[0] == "event"
+
+
+def test_scan_event_fills_fields(session, tmp_path):
+    _write_note(tmp_path, "2026-06-18-1000-padel.md", NOTE)
+    classify = lambda p: '{"category":"event","proposed_text":"pádel"}'
+    event_llm = lambda p: '{"summary":"Pádel con Marc","start":"2026-06-20T18:00:00","end":"2026-06-20T19:00:00","all_day":false,"theme":"padel"}'
+
+    item = scan_inbox(session, tmp_path, classify, event_llm=event_llm)[0]
+
+    assert item.category == "event"
+    assert item.proposed_text == "Pádel con Marc"
+    assert item.event_start == "2026-06-20T18:00:00"
+    assert item.theme == "padel"
+
+
+def test_scan_event_extraction_failure_falls_to_uncertain(session, tmp_path):
+    _write_note(tmp_path, "2026-06-18-1000-x.md", NOTE)
+    classify = lambda p: '{"category":"event","proposed_text":"algo"}'
+    def event_llm(p):
+        raise RuntimeError("down")
+
+    item = scan_inbox(session, tmp_path, classify, event_llm=event_llm)[0]
+
+    assert item.category == "uncertain"
+    assert item.event_start is None
+
+
+def test_apply_event_creates_archives_and_marks_scheduled(session, tmp_path):
+    _write_note(tmp_path, "2026-06-18-1000-padel.md", NOTE)
+    classify = lambda p: '{"category":"event","proposed_text":"pádel"}'
+    event_llm = lambda p: '{"summary":"Pádel","start":"2026-06-20T18:00:00","end":"2026-06-20T19:00:00","all_day":false,"theme":"padel"}'
+    item = scan_inbox(session, tmp_path, classify, event_llm=event_llm)[0]
+
+    calls = {}
+    def fake_create(summary, start, end, all_day, theme):
+        calls.update(summary=summary, start=start, theme=theme)
+        return ("evt123", "https://cal/evt123")
+
+    result, link = apply_event(session, item, tmp_path, fake_create)
+
+    assert calls["summary"] == "Pádel"
+    assert calls["theme"] == "padel"
+    assert link == "https://cal/evt123"
+    assert result.status == "scheduled"
+    assert result.calendar_event_id == "evt123"
+    assert (tmp_path / "archivo" / "2026-06-18-1000-padel.md").exists()
+    assert not (tmp_path / "inbox" / "2026-06-18-1000-padel.md").exists()
 
 
 def test_apply_suggested_applies_task_and_note_only(session, tmp_path):

@@ -6,11 +6,40 @@ from sqlmodel import Session
 
 from app.config import settings
 from app.database import engine
-from app.services.llm import complete_tags
+from app.services.llm import complete_tags, complete_event
+from app.services.calendar import create_event as cal_create_event
 from app.modules.inbox.service import (
-    scan_inbox, pending_items, apply_item, apply_suggested, get_item,
+    scan_inbox, pending_items, apply_item, apply_suggested, get_item, apply_event,
+    extract_event, _today_str,
 )
 from bot.handlers import allowed, safe_reply
+
+
+def _fmt_when(item) -> str:
+    from datetime import datetime
+    if item.all_day:
+        return f"{item.event_start} (todo el día)"
+    try:
+        s = datetime.fromisoformat(item.event_start)
+        e = datetime.fromisoformat(item.event_end)
+        return f"{s:%d/%m %H:%M}–{e:%H:%M}"
+    except (ValueError, TypeError):
+        return item.event_start or ""
+
+
+def _event_card(item) -> tuple[str, InlineKeyboardMarkup]:
+    text = f"📅 *Evento*: {item.proposed_text}  [{item.theme}]\n{_fmt_when(item)}"
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📅 Crear", callback_data=f"inbox:event:{item.id}"),
+            InlineKeyboardButton("✏️ Editar fecha", callback_data=f"inbox:editdate:{item.id}"),
+        ],
+        [
+            InlineKeyboardButton("📄 Archivar", callback_data=f"inbox:note:{item.id}"),
+            InlineKeyboardButton("✗ Descartar", callback_data=f"inbox:discard:{item.id}"),
+        ],
+    ])
+    return text, kb
 
 
 def build_digest(session) -> list[tuple[str, InlineKeyboardMarkup | None]]:
@@ -46,6 +75,10 @@ def build_digest(session) -> list[tuple[str, InlineKeyboardMarkup | None]]:
         ])
         messages.append((f"*Dudosa*{voice}:\n{i.excerpt}", kb))
 
+    for i in items:
+        if i.category == "event":
+            messages.append(_event_card(i))
+
     return messages
 
 
@@ -53,7 +86,7 @@ def _scan_and_digest(vault_path) -> list[tuple[str, InlineKeyboardMarkup | None]
     """Runs in a worker thread: own session, LLM classification (slow), then
     builds detached (text, keyboard) tuples that outlive the session."""
     with Session(engine) as session:
-        scan_inbox(session, vault_path, complete_tags)
+        scan_inbox(session, vault_path, complete_tags, event_llm=complete_event)
         return build_digest(session)
 
 
@@ -99,6 +132,25 @@ async def callback_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _edit_or_send(update, query, "Envíame el texto corregido de la tarea.")
         return
 
+    if action == "editdate":
+        context.user_data["inbox_event_edit_id"] = item_id
+        await _edit_or_send(update, query, "Envíame la fecha corregida del evento.")
+        return
+
+    if action == "event":
+        with Session(engine) as session:
+            item = get_item(session, item_id)
+            if not item or item.status != "pending":
+                await _edit_or_send(update, query, "Ya resuelta.")
+                return
+            try:
+                _, link = apply_event(session, item, settings.OBSIDIAN_VAULT_PATH, cal_create_event)
+            except Exception:
+                await _edit_or_send(update, query, "No pude crear el evento (¿Google Calendar configurado?). La nota sigue pendiente.")
+                return
+        await _edit_or_send(update, query, f"📅 Evento creado: {link}")
+        return
+
     with Session(engine) as session:
         item = get_item(session, item_id)
         if not item or item.status != "pending":
@@ -119,6 +171,30 @@ async def apply_edited_task(update: Update, item_id: int, text: str) -> bool:
             return False
         apply_item(session, item, settings.OBSIDIAN_VAULT_PATH, "task", override_text=text)
     await safe_reply(update, f"✓ Tarea creada: {text}")
+    return True
+
+
+async def reextract_event_date(update: Update, item_id: int, text: str) -> bool:
+    """Re-extrae fecha/hora del evento con el texto corregido y reenvía la tarjeta
+    para confirmar (no crea el evento). False si el item ya no está pending."""
+    with Session(engine) as session:
+        item = get_item(session, item_id)
+        if not item or item.status != "pending":
+            return False
+        data = extract_event(text, _today_str(), complete_event)
+        if not data:
+            await safe_reply(update, "No pude entender la fecha. Prueba de nuevo o usa los botones.")
+            return True
+        item.proposed_text = data["summary"]
+        item.event_start = data["start"]
+        item.event_end = data["end"]
+        item.all_day = data["all_day"]
+        item.theme = data["theme"]
+        session.add(item)
+        session.commit()
+        session.refresh(item)
+        card_text, kb = _event_card(item)
+    await update.effective_chat.send_message(text=card_text, parse_mode="Markdown", reply_markup=kb)
     return True
 
 

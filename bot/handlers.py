@@ -382,6 +382,11 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         from bot.inbox_handlers import apply_edited_task
         if await apply_edited_task(update, edit_id, update.message.text.strip()):
             return
+    event_edit_id = context.user_data.pop("inbox_event_edit_id", None)
+    if event_edit_id is not None:
+        from bot.inbox_handlers import reextract_event_date
+        if await reextract_event_date(update, event_edit_id, update.message.text.strip()):
+            return
     text = update.message.text
 
     parsed = parse_expense(text)

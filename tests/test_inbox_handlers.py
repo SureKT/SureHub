@@ -46,6 +46,23 @@ def test_build_digest_groups_confident_and_uncertain(session, tmp_path):
     assert any(d.startswith("inbox:edit:") for d in datas)
 
 
+def test_build_digest_event_card(session, tmp_path):
+    _write(tmp_path, "ev.md")
+    classify = lambda p: '{"category":"event","proposed_text":"x"}'
+    event_llm = lambda p: '{"summary":"Pádel con Marc","start":"2026-06-20T18:00:00","end":"2026-06-20T19:00:00","all_day":false,"theme":"padel"}'
+    scan_inbox(session, tmp_path, classify, event_llm=event_llm)
+
+    messages = ih.build_digest(session)
+
+    assert len(messages) == 1
+    text, kb = messages[0]
+    assert "Pádel con Marc" in text
+    assert "padel" in text
+    datas = [b.callback_data for row in kb.inline_keyboard for b in row]
+    assert any(d.startswith("inbox:event:") for d in datas)
+    assert any(d.startswith("inbox:editdate:") for d in datas)
+
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -166,6 +183,73 @@ async def test_apply_edited_task_unknown_id(monkeypatch, tmp_path):
     monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
     update = make_update()
     assert await ih.apply_edited_task(update, 9999, "x") is False
+
+
+async def test_callback_event_creates_and_replies_link(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    _write(tmp_path, "ev.md")
+    classify = lambda p: '{"category":"event","proposed_text":"x"}'
+    event_llm = lambda p: '{"summary":"Pádel","start":"2026-06-20T18:00:00","end":"2026-06-20T19:00:00","all_day":false,"theme":"padel"}'
+    item = scan_inbox(session, tmp_path, classify, event_llm=event_llm)[0]
+    monkeypatch.setattr(ih, "cal_create_event", lambda *a, **k: ("evt1", "https://cal/evt1"))
+
+    update, query = make_callback_update(f"inbox:event:{item.id}")
+    await ih.callback_inbox(update, make_context())
+
+    assert "https://cal/evt1" in query.edit_message_text.call_args.args[0]
+    assert (tmp_path / "archivo" / "ev.md").exists()
+
+
+async def test_callback_event_create_failure_keeps_pending(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    _write(tmp_path, "ev.md")
+    classify = lambda p: '{"category":"event","proposed_text":"x"}'
+    event_llm = lambda p: '{"summary":"Pádel","start":"2026-06-20T18:00:00","end":"2026-06-20T19:00:00","all_day":false,"theme":"padel"}'
+    item = scan_inbox(session, tmp_path, classify, event_llm=event_llm)[0]
+
+    def boom(*a, **k):
+        raise FileNotFoundError("no token")
+    monkeypatch.setattr(ih, "cal_create_event", boom)
+
+    update, query = make_callback_update(f"inbox:event:{item.id}")
+    await ih.callback_inbox(update, make_context())
+
+    assert "No pude crear" in query.edit_message_text.call_args.args[0]
+    # la nota no se movió ni cambió de estado
+    assert (tmp_path / "inbox" / "ev.md").exists()
+
+
+async def test_callback_editdate_prompts_and_sets_state(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    _write(tmp_path, "ev.md")
+    classify = lambda p: '{"category":"event","proposed_text":"x"}'
+    event_llm = lambda p: '{"summary":"Pádel","start":"2026-06-20T18:00:00","end":"2026-06-20T19:00:00","all_day":false,"theme":"padel"}'
+    item = scan_inbox(session, tmp_path, classify, event_llm=event_llm)[0]
+
+    update, query = make_callback_update(f"inbox:editdate:{item.id}")
+    context = make_context()
+    await ih.callback_inbox(update, context)
+
+    assert context.user_data["inbox_event_edit_id"] == item.id
+    assert "fecha" in query.edit_message_text.call_args.args[0].lower()
+
+
+async def test_reextract_event_date_updates_and_resends_card(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(ih.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    _write(tmp_path, "ev.md")
+    classify = lambda p: '{"category":"event","proposed_text":"x"}'
+    event_llm = lambda p: '{"summary":"Pádel","start":"2026-06-20T18:00:00","end":"2026-06-20T19:00:00","all_day":false,"theme":"padel"}'
+    item = scan_inbox(session, tmp_path, classify, event_llm=event_llm)[0]
+    monkeypatch.setattr(ih, "complete_event",
+                        lambda p: '{"summary":"Pádel","start":"2026-06-21T10:00:00","end":"2026-06-21T11:00:00","all_day":false,"theme":"padel"}')
+
+    update = make_update()
+    update.effective_chat.send_message = AsyncMock()
+    handled = await ih.reextract_event_date(update, item.id, "mejor el sábado a las 10")
+
+    assert handled is True
+    sent = update.effective_chat.send_message.call_args
+    assert "21/06 10:00" in sent.kwargs.get("text", sent.args[0] if sent.args else "")
 
 
 async def test_inbox_digest_job_sends_to_user(monkeypatch, tmp_path, session):

@@ -93,13 +93,15 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 
 - Módulo `app/modules/inbox/` + handlers en `bot/inbox_handlers.py`
 - Modelo `InboxItem` en SQLite (`inbox_items`): trackea cada `.md` visto en `inbox/` + propuesta IA + estado
-- Clasificación Haiku vía `complete_tags` → `task` | `note` | `uncertain` (fallo LLM → `uncertain`, nunca se pierde la nota)
+- Clasificación Haiku vía `complete_tags` → `task` | `note` | `event` | `uncertain` (fallo LLM → `uncertain`, nunca se pierde la nota)
 - Comando `/inbox`: escanea notas nuevas, envía digest Telegram con aprobación en lote
 - Digest diario: `JobQueue.run_daily` a las `INBOX_DIGEST_HOUR` (default 9, `TIMEZONE`)
 - Acciones reversibles (mover `.md`): `task` → línea en `Tareas.md` + `archivo/`; `note` → `archivo/`; `discard` → `inbox/_descartado/`
 - Notas `uncertain` (o voz 🎤): botones individuales + flujo editar (siguiente mensaje de texto)
-- Spec: `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`
-- Fase 2 pendiente: eventos → Google Calendar (OAuth)
+- Eventos (`event`): Sonnet extrae fecha/duración/temática (`extract_event` en `service.py`, 2ª llamada solo en notas-evento; fallo → la nota cae a `uncertain`). Tarjeta **individual** en el digest con fecha legible; `📅 Crear` → Google Calendar (`app/services/calendar.py`) con color por temática (`CALENDAR_COLORS`), nota → `archivo/`, status `scheduled`, guarda `calendar_event_id`, responde con link. `✏️ Editar fecha` re-extrae y reenvía la tarjeta. Sin comando Telegram (se gestiona desde el digest). Duración: explícita / inicio+fin / +1h default / all-day sin hora
+- Google Calendar: OAuth one-time vía `scripts/google_auth.py` (genera token; en prod en volumen `/srv/surehub/data`). Env: `GOOGLE_CALENDAR_CREDENTIALS`, `GOOGLE_CALENDAR_TOKEN`, `GOOGLE_CALENDAR_ID` (default `primary`)
+- Spec Fase 1: `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`
+- Spec Fase 2 (hecho 2026-06-18): `docs/superpowers/specs/2026-06-18-inbox-calendar-events-design.md`
 
 ## Estado actual del módulo Finanzas
 - Modelos: `Category` (name, type, monthly_estimate, active) + `Expense` (category_id FK, amount, description, date, source) + `RecurringExpense` (name, amount, category_id, day, active)

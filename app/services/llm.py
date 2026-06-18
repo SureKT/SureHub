@@ -36,3 +36,13 @@ def complete_tags(prompt: str) -> str:
         messages=[{"role": "user", "content": prompt}],
     )
     return response.content[0].text
+
+
+def complete_event(prompt: str) -> str:
+    """Extracción de fecha/hora de eventos — Sonnet (mejor con fechas relativas)."""
+    response = client.messages.create(
+        model=settings.LLM_MODEL,
+        max_tokens=300,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.content[0].text

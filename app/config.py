@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "claude-sonnet-4-6"
     TAG_MODEL: str = "claude-haiku-4-5"
 
+    # Google Calendar (Inbox Fase 2 — eventos)
+    GOOGLE_CALENDAR_CREDENTIALS: str = "./data/google_client_secret.json"
+    GOOGLE_CALENDAR_TOKEN: str = "./data/google_token.json"
+    GOOGLE_CALENDAR_ID: str = "primary"
+
     @property
     def allowed_user_ids(self) -> list[int]:
         return [int(uid.strip()) for uid in self.TELEGRAM_ALLOWED_USER_IDS.split(",")]
