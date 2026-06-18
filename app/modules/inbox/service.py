@@ -86,3 +86,64 @@ def scan_inbox(session: Session, vault_path, llm: Callable[[str], str]) -> list[
     for item in created:
         session.refresh(item)
     return created
+
+
+def _move(src: Path, dest_dir: Path) -> Path:
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / src.name
+    counter = 2
+    while dest.exists():
+        dest = dest_dir / f"{src.stem}-{counter}{src.suffix}"
+        counter += 1
+    src.rename(dest)
+    return dest
+
+
+def _append_task(vault_path, text: str, filename: str) -> None:
+    tasks_file = Path(vault_path) / "Tareas.md"
+    backlink = Path(filename).stem
+    with tasks_file.open("a", encoding="utf-8") as f:
+        f.write(f"- [ ] {text}  ([[{backlink}]])\n")
+
+
+def pending_items(session: Session) -> list[InboxItem]:
+    return session.exec(select(InboxItem).where(InboxItem.status == "pending")).all()
+
+
+def get_item(session: Session, item_id: int) -> InboxItem | None:
+    return session.get(InboxItem, item_id)
+
+
+def apply_item(session: Session, item: InboxItem, vault_path, action: str,
+               override_text: str | None = None) -> InboxItem:
+    vault = Path(vault_path)
+    note_path = vault / "inbox" / item.filename
+    if action == "task":
+        _append_task(vault_path, override_text or item.proposed_text, item.filename)
+        if note_path.exists():
+            _move(note_path, vault / "archivo")
+        item.status = "approved"
+    elif action == "note":
+        if note_path.exists():
+            _move(note_path, vault / "archivo")
+        item.status = "archived"
+    elif action == "discard":
+        if note_path.exists():
+            _move(note_path, vault / "inbox" / "_descartado")
+        item.status = "discarded"
+    else:
+        raise ValueError(f"unknown action: {action}")
+    item.resolved_at = datetime.utcnow()
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    return item
+
+
+def apply_suggested(session: Session, vault_path) -> dict:
+    counts = {"task": 0, "note": 0}
+    for item in pending_items(session):
+        if item.category in ("task", "note"):
+            apply_item(session, item, vault_path, item.category)
+            counts[item.category] += 1
+    return counts

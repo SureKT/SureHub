@@ -1,7 +1,14 @@
 from sqlmodel import select
 
 from app.modules.inbox.models import InboxItem
-from app.modules.inbox.service import classify_note, scan_inbox
+from app.modules.inbox.service import (
+    classify_note,
+    scan_inbox,
+    apply_item,
+    apply_suggested,
+    pending_items,
+    get_item,
+)
 
 
 def test_inbox_item_persists(session):
@@ -87,3 +94,67 @@ def test_scan_skips_already_seen(session, tmp_path):
 
 def test_scan_no_inbox_dir_returns_empty(session, tmp_path):
     assert scan_inbox(session, tmp_path, lambda p: "{}") == []
+
+
+def test_apply_task_appends_and_archives(session, tmp_path):
+    _write_note(tmp_path, "2026-06-18-1000-pan.md")
+    llm = lambda prompt: '{"category": "task", "proposed_text": "comprar pan"}'
+    item = scan_inbox(session, tmp_path, llm)[0]
+
+    apply_item(session, item, tmp_path, "task")
+
+    tasks = (tmp_path / "Tareas.md").read_text(encoding="utf-8")
+    assert "- [ ] comprar pan" in tasks
+    assert "[[2026-06-18-1000-pan]]" in tasks
+    assert not (tmp_path / "inbox" / "2026-06-18-1000-pan.md").exists()
+    assert (tmp_path / "archivo" / "2026-06-18-1000-pan.md").exists()
+    assert item.status == "approved"
+
+
+def test_apply_task_override_text(session, tmp_path):
+    _write_note(tmp_path, "n.md")
+    item = scan_inbox(session, tmp_path, lambda p: '{"category":"task","proposed_text":"mal"}')[0]
+
+    apply_item(session, item, tmp_path, "task", override_text="texto corregido")
+
+    assert "- [ ] texto corregido" in (tmp_path / "Tareas.md").read_text(encoding="utf-8")
+
+
+def test_apply_note_archives(session, tmp_path):
+    _write_note(tmp_path, "n.md")
+    item = scan_inbox(session, tmp_path, lambda p: '{"category":"note","proposed_text":"idea"}')[0]
+
+    apply_item(session, item, tmp_path, "note")
+
+    assert (tmp_path / "archivo" / "n.md").exists()
+    assert not (tmp_path / "Tareas.md").exists()
+    assert item.status == "archived"
+
+
+def test_apply_discard_moves_to_descartado(session, tmp_path):
+    _write_note(tmp_path, "n.md")
+    item = scan_inbox(session, tmp_path, lambda p: '{"category":"uncertain","proposed_text":"?"}')[0]
+
+    apply_item(session, item, tmp_path, "discard")
+
+    assert (tmp_path / "inbox" / "_descartado" / "n.md").exists()
+    assert item.status == "discarded"
+
+
+def test_apply_suggested_applies_task_and_note_only(session, tmp_path):
+    _write_note(tmp_path, "a.md")
+    _write_note(tmp_path, "b.md")
+    _write_note(tmp_path, "c.md")
+    cats = iter([
+        '{"category":"task","proposed_text":"t"}',
+        '{"category":"note","proposed_text":"n"}',
+        '{"category":"uncertain","proposed_text":"?"}',
+    ])
+    scan_inbox(session, tmp_path, lambda p: next(cats))
+
+    counts = apply_suggested(session, tmp_path)
+
+    assert counts == {"task": 1, "note": 1}
+    # the uncertain one stays pending
+    assert len(pending_items(session)) == 1
+    assert pending_items(session)[0].category == "uncertain"
