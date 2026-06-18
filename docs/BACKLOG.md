@@ -6,15 +6,10 @@ La sesión de Claude Code (server, Remote Control) mantiene este fichero: pedir
 
 ## En curso
 
-(vacío)
+- [ ] Procesado de inbox **Fase 1** (clasificación + digest + tareas→Obsidian) — en implementación.
+  Fase 2 (eventos→Google Calendar) pendiente. Spec: `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`.
 
 ## Pendiente
-
-- [ ] **Captura de tareas/recordatorios en el bot** — comando + parsing, para no
-  enterrar tareas en notas de texto libre. (Detectado: 3 de 5 notas de la inbox eran tareas.)
-- [ ] **Procesar notas → tareas/recordatorios/eventos con IA** — capa sobre lo capturado.
-  Extraer lo accionable de cada nota. (Petición explícita en una nota de voz.)
-  Ojo: "buscar/chatear sobre notas" es Khoj, no reinventar; esto es solo extraer accionables.
 
 ## Hecho
 
