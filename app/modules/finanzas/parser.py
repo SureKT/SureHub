@@ -19,11 +19,12 @@ PATTERN = re.compile(
 # Keywords → category name (must match Category.name in DB)
 KEYWORDS: dict[str, list[str]] = {
     "Supermercado": ["mercadona", "lidl", "carrefour", "aldi", "consum", "supermercado", "compra", "family"],
-    "Restaurantes": ["restaurante", "bar", "fanta", "bravas", "buffalo", "terra", "ibérica", "almuerzo", "cena"],
-    "Ocio": ["cine", "teatro", "billar", "ocio"],
-    "Padel / Deporte": ["pádel", "padel", "pcv", "climb", "deporte"],
-    "Gasolina / Transporte": ["gasolina", "gasolinera", "bus", "metro", "taxi", "uber", "parking"],
-    "Suplementos": ["creatina", "proteína", "suplemento"],
+    "Restaurantes": ["restaurante", "bar", "bravas", "buffalo", "almuerzo", "cena", "kebab", "ramen", "fuji", "sushi", "chino", "indio", "nepalí"],
+    "Ocio": ["cine", "teatro", "billar", "ocio", "helado", "horchata", "bolera", "concierto"],
+    "Padel / Deporte": ["pádel", "padel", "pcv", "fullpadel", "climb", "roco", "benaguacil", "escalada", "deporte"],
+    "Psicólogo": ["terapia", "psicólogo"],
+    "Gasolina / Transporte": ["gasolina", "gasolinera", "ballenoil", "plenoil", "bus", "metro", "fgv", "emt", "taxi", "uber", "parking"],
+    "Suplementos": ["creatina", "proteína", "suplemento", "magnesio"],
     "Gimnasio": ["gym", "gimnasio"],
     "Viajes": ["viaje", "vuelo", "hotel", "cumple"],
 }

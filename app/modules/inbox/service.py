@@ -36,7 +36,13 @@ EVENT_PROMPT = (
     "- Inicio y fin dados ('de 18 a 20') -> úsalos tal cual.\n"
     "- Solo hora de inicio -> end = start + 1 hora.\n"
     "- Sin ninguna hora -> all_day=true.\n"
-    "- theme: una de [coach, formacion, social, gimnasio, padel]; si no encaja, 'default'.\n\n"
+    "- theme: una de [coach, formacion, social, gimnasio, padel]; si no encaja, 'default'.\n"
+    "Contexto personal para theme y summary:\n"
+    "- Diana / terapia → theme=coach, summary='Terapia'\n"
+    "- Fullpadel / PCV / Pádel Club Valencia / padel / pádel → theme=padel, summary='Pádel'\n"
+    "- Natural Climb / Roco / escalada → theme=gimnasio, summary='Escalada'\n"
+    "- gym / gimnasio → theme=gimnasio, summary='Gimnasio'\n"
+    "- cine / teatro / concierto / cena social / billar / bolera → theme=social\n\n"
     "Nota:\n{text}"
 )
 
