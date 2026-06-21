@@ -21,7 +21,7 @@ KEYWORDS: dict[str, list[str]] = {
     "Supermercado": ["mercadona", "lidl", "carrefour", "aldi", "consum", "supermercado", "compra", "family"],
     "Restaurantes": ["restaurante", "bar", "bravas", "buffalo", "almuerzo", "cena", "kebab", "ramen", "fuji", "sushi", "chino", "indio", "nepalí"],
     "Ocio": ["cine", "teatro", "billar", "ocio", "helado", "horchata", "bolera", "concierto"],
-    "Padel / Deporte": ["pádel", "padel", "pcv", "fullpadel", "climb", "roco", "benaguacil", "escalada", "deporte"],
+    "Padel / Deporte": ["pádel", "padel", "pcv", "fullpadel", "climb", "roco", "escalada", "deporte"],
     "Psicólogo": ["terapia", "psicólogo"],
     "Gasolina / Transporte": ["gasolina", "gasolinera", "ballenoil", "plenoil", "bus", "metro", "fgv", "emt", "taxi", "uber", "parking"],
     "Suplementos": ["creatina", "proteína", "suplemento", "magnesio"],
