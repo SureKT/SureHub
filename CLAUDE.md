@@ -49,6 +49,11 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Migraciones de DB: SQLite soporta ALTER TABLE ADD COLUMN sin perder datos. Para cambios mayores, script en `scripts/`
 - **Documentación:** si cambia comportamiento visible (bot, API, módulos, env vars, infra), actualizar `CLAUDE.md` y lo que aplique (`docs/architecture.md`, `.env.example`) en el mismo commit — no cerrar features con docs obsoletas
 
+## Tests
+- Tests en `tests/`. Runner: `pytest -q` (CI en cada push a `main`)
+- **Antes de commitear cualquier cambio de comportamiento:** `grep -r "nombre_función_o_módulo" tests/` — si hay tests que cubren el código modificado, actualizarlos en el mismo commit. No commitear con tests que fallan o que verifican comportamiento ya obsoleto
+- Si el comportamiento cambia (UX, API, lógica de clasificación, formato de mensajes), los tests de ese módulo son parte del cambio, no un afterthought
+
 ## Commits y deploy
 - Al **cerrar una feature o fix** (tests OK, usuario confirma o scope claro): **commit + push a `main` sin pedir permiso**
 - También al confirmar explícitamente ("funciona", "listo", "perfecto", "ok", "perfecto")
