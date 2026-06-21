@@ -43,8 +43,8 @@ def _event_card(item) -> tuple[str, InlineKeyboardMarkup]:
 
 
 def _confident_card(item) -> tuple[str, InlineKeyboardMarkup]:
-    label = "Tarea" if item.category == "task" else "Nota"
-    text = f"*{label}* (sugerido):\n{item.proposed_text}"
+    icon, label = ("✅", "Tarea") if item.category == "task" else ("📄", "Nota")
+    text = f"{icon} *{label}* (sugerido):\n{item.proposed_text}"
     kb = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("✓ Tarea", callback_data=f"inbox:task:{item.id}"),
@@ -82,7 +82,7 @@ def build_digest(session) -> list[tuple[str, InlineKeyboardMarkup | None]]:
                 InlineKeyboardButton("✏️ Editar", callback_data=f"inbox:edit:{i.id}"),
             ],
         ])
-        messages.append((f"*Dudosa*{voice}:\n{i.excerpt}", kb))
+        messages.append((f"❓ *Dudosa*{voice}:\n{i.excerpt}", kb))
 
     for i in items:
         if i.category == "event":
