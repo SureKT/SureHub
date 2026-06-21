@@ -21,6 +21,25 @@ def list_categories(session: Session, active_only: bool = True) -> list[Category
     return list(session.exec(q.order_by(Category.type, Category.name)).all())
 
 
+def suggest_categories(session: Session, limit: int = 8) -> list[Category]:
+    """Variable categories ordered by recent manual expense frequency (90d), then name."""
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).strftime("%Y-%m-%d")
+    usage = {
+        cat_id: cnt
+        for cat_id, cnt in session.exec(
+            select(Expense.category_id, func.count().label("cnt"))
+            .where(Expense.date >= cutoff)
+            .where(Expense.source.in_(("telegram", "manual")))
+            .group_by(Expense.category_id)
+        ).all()
+    }
+    cats = session.exec(
+        select(Category).where(Category.active == True).where(Category.type == "variable")  # noqa: E712
+    ).all()
+    return sorted(cats, key=lambda c: (-usage.get(c.id, 0), c.name))[:limit]
+
+
 def find_category(session: Session, name: str) -> Category | None:
     return session.exec(
         select(Category).where(func.lower(Category.name) == name.lower())

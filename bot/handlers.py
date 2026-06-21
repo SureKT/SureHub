@@ -1,4 +1,5 @@
 import asyncio
+import html
 import logging
 import tempfile
 from datetime import datetime, timezone
@@ -13,7 +14,7 @@ from app.modules.finanzas.models import Expense, Category
 from app.modules.finanzas.parser import parse_expense
 from app.modules.finanzas.service import (
     register_expense, latest_expenses, month_total,
-    month_summary, find_category, list_categories, get_expenses_filtered,
+    month_summary, find_category, list_categories, get_expenses_filtered, suggest_categories,
 )
 from app.modules.memoria.service import build_context
 from app.modules.notes.service import create_note, extract_tags
@@ -81,7 +82,7 @@ def _build_finance_context(session) -> str:
 
 
 def _category_keyboard(session) -> InlineKeyboardMarkup:
-    cats = list_categories(session)[:8]
+    cats = suggest_categories(session)
     buttons = [InlineKeyboardButton(c.name, callback_data=f"cat:{c.id}") for c in cats]
     rows = [buttons[i:i+2] for i in range(0, len(buttons), 2)]
     rows.append([InlineKeyboardButton("Sin categoría", callback_data="cat:0")])
@@ -171,7 +172,7 @@ async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
             cat_name = cat.name if cat else "—"
             desc = f" {e.description}" if e.description else ""
             date = e.date.strftime("%d/%m") if e.date else ""
-            lines.append(f"`{e.id:4d}` {date}  *{e.amount:.2f}€*  {cat_name}{desc}")
+            lines.append(f"{date}  *{e.amount:.2f}€*  {cat_name}{desc}")
 
         header = f"Mes actual ({total_count} gastos):" if filter_month else "Últimos gastos:"
 
@@ -251,8 +252,8 @@ async def callback_categoria(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data.pop("pending_expense", None)
     await _edit_or_send(
         update, query,
-        f"✓ *{pending['description']}* — {pending['amount']:.2f}€ ({cat_name})",
-        parse_mode="Markdown"
+        f"✓ <b>{html.escape(pending['description'])}</b> — {pending['amount']:.2f}€ ({html.escape(cat_name)})",
+        parse_mode="HTML"
     )
 
 
@@ -397,8 +398,8 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if cat:
                 register_expense(session, parsed.amount, cat.id, parsed.description)
                 await safe_reply(update,
-                    f"✓ *{parsed.description}* — {parsed.amount:.2f}€ ({cat.name})",
-                    parse_mode="Markdown"
+                    f"✓ <b>{html.escape(parsed.description)}</b> — {parsed.amount:.2f}€ ({html.escape(cat.name)})",
+                    parse_mode="HTML"
                 )
             else:
                 context.user_data["pending_expense"] = {
@@ -406,8 +407,8 @@ async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "amount": parsed.amount,
                 }
                 await safe_reply(update,
-                    f"*{parsed.description}* — {parsed.amount:.2f}€\n¿Categoría?",
-                    parse_mode="Markdown",
+                    f"<b>{html.escape(parsed.description)}</b> — {parsed.amount:.2f}€\n¿Categoría?",
+                    parse_mode="HTML",
                     reply_markup=_category_keyboard(session),
                 )
         return

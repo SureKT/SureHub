@@ -16,6 +16,7 @@ from app.modules.finanzas.service import (
     month_total_by_category,
     monthly_evolution,
     register_expense,
+    suggest_categories,
 )
 
 YEAR, MONTH = 2026, 1  # fixed past month so summary fraction is 1.0
@@ -60,6 +61,30 @@ class TestCategories:
         assert [c.id for c in list_categories(session)] == [active.id]
         all_ids = {c.id for c in list_categories(session, active_only=False)}
         assert all_ids == {active.id, inactive.id}
+
+
+class TestSuggestCategories:
+    def test_excludes_fixed_categories(self, session):
+        create_category(session, "Netflix", "fixed")
+        var = create_category(session, "Supermercado", "variable")
+        result = suggest_categories(session)
+        assert all(c.type == "variable" for c in result)
+        assert any(c.id == var.id for c in result)
+
+    def test_orders_by_recent_usage(self, session):
+        sup = create_category(session, "Supermercado", "variable")
+        ocio = create_category(session, "Ocio", "variable")
+        register_expense(session, 10.0, sup.id, "mercadona", source="telegram")
+        register_expense(session, 20.0, sup.id, "mercadona", source="telegram")
+        register_expense(session, 5.0, ocio.id, "cine", source="telegram")
+        result = suggest_categories(session)
+        assert result[0].id == sup.id
+        assert result[1].id == ocio.id
+
+    def test_respects_limit(self, session):
+        for i in range(10):
+            create_category(session, f"Cat{i}", "variable")
+        assert len(suggest_categories(session, limit=3)) == 3
 
     def test_find_category_case_insensitive(self, session):
         cat = create_category(session, "Supermercado", "variable")
