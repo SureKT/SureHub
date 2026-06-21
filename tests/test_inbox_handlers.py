@@ -32,15 +32,16 @@ def test_build_digest_groups_confident_and_uncertain(session, tmp_path):
 
     messages = ih.build_digest(session)
 
-    # one batch message for confident + one per uncertain
+    # one individual card per confident + one per uncertain
     assert len(messages) == 2
-    batch_text, batch_kb = messages[0]
-    assert "comprar pan" in batch_text
-    assert isinstance(batch_kb, InlineKeyboardMarkup)
-    assert batch_kb.inline_keyboard[0][0].callback_data == "inbox:applyall"
+    task_text, task_kb = messages[0]
+    assert "comprar pan" in task_text
+    assert isinstance(task_kb, InlineKeyboardMarkup)
+    datas = [b.callback_data for row in task_kb.inline_keyboard for b in row]
+    assert any(d.startswith("inbox:task:") for d in datas)
+    assert any(d.startswith("inbox:edit:") for d in datas)
     uncertain_text, uncertain_kb = messages[1]
     assert "Dudosa" in uncertain_text
-    # has task/note/discard/edit buttons
     datas = [b.callback_data for row in uncertain_kb.inline_keyboard for b in row]
     assert any(d.startswith("inbox:task:") for d in datas)
     assert any(d.startswith("inbox:edit:") for d in datas)
