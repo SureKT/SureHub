@@ -42,22 +42,31 @@ def _event_card(item) -> tuple[str, InlineKeyboardMarkup]:
     return text, kb
 
 
+def _confident_card(item) -> tuple[str, InlineKeyboardMarkup]:
+    label = "Tarea" if item.category == "task" else "Nota"
+    text = f"*{label}* (sugerido):\n{item.proposed_text}"
+    kb = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✓ Tarea", callback_data=f"inbox:task:{item.id}"),
+            InlineKeyboardButton("📄 Archivar", callback_data=f"inbox:note:{item.id}"),
+        ],
+        [
+            InlineKeyboardButton("✗ Descartar", callback_data=f"inbox:discard:{item.id}"),
+            InlineKeyboardButton("✏️ Editar", callback_data=f"inbox:edit:{item.id}"),
+        ],
+    ])
+    return text, kb
+
+
 def build_digest(session) -> list[tuple[str, InlineKeyboardMarkup | None]]:
     items = pending_items(session)
     if not items:
         return []
     messages: list[tuple[str, InlineKeyboardMarkup | None]] = []
 
-    confident = [i for i in items if i.category in ("task", "note")]
-    if confident:
-        lines = ["*Sugeridos* (los aplico en lote):"]
-        for i in confident:
-            icon = "✅" if i.category == "task" else "📄"
-            lines.append(f"{icon} {i.proposed_text}")
-        kb = InlineKeyboardMarkup(
-            [[InlineKeyboardButton("✓ Aplicar sugeridos", callback_data="inbox:applyall")]]
-        )
-        messages.append(("\n".join(lines), kb))
+    for i in items:
+        if i.category in ("task", "note"):
+            messages.append(_confident_card(i))
 
     for i in items:
         if i.category != "uncertain":

@@ -14,8 +14,9 @@ VALID_THEMES = ("coach", "formacion", "social", "gimnasio", "padel", "default")
 CLASSIFY_PROMPT = (
     "Clasifica esta nota personal y extrae el texto accionable.\n"
     "Categorías:\n"
-    "- task: algo que hacer sin hora concreta (comprar, llamar, revisar...).\n"
-    "- note: información o idea, no accionable.\n"
+    "- task: algo para hacer o resolver. Incluye: listas de compras, bugs ('falla', 'hay un problema'), "
+    "deseos de mejora ('quiero que', 'sería bueno'), investigar, cualquier acción pendiente.\n"
+    "- note: información o idea puramente informativa, sin acción implícita.\n"
     "- event: algo con fecha/hora concreta (cita, cena, partido, clase...).\n"
     "- uncertain: ambigua o muy corta.\n"
     'Responde SOLO un JSON: {{"category": "task|note|event|uncertain", "proposed_text": "<texto>"}}.\n'
