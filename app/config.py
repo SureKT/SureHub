@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     WHISPER_LANGUAGE: str = "es"
     WHISPER_CACHE_DIR: str = "/data/.cache/whisper"
 
+    # Google Calendar (OAuth)
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8001/api/calendar/oauth/callback"
+
     # LLM — tags usan Haiku (barato); chat/análisis usan Sonnet
     LLM_MODEL: str = "claude-sonnet-4-6"
     TAG_MODEL: str = "claude-haiku-4-5"
