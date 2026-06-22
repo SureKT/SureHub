@@ -15,8 +15,11 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar.readonly",
 ]
 
+# Single-user: guardamos el flow entre /oauth/init y /oauth/callback
+_pending_flow: Optional[Flow] = None
 
-def _flow() -> Flow:
+
+def _build_flow() -> Flow:
     client_config = {
         "web": {
             "client_id": settings.GOOGLE_CLIENT_ID,
@@ -32,12 +35,18 @@ def _flow() -> Flow:
 
 
 def get_auth_url() -> str:
-    auth_url, _ = _flow().authorization_url(prompt="consent", access_type="offline")
+    global _pending_flow
+    _pending_flow = _build_flow()
+    auth_url, _ = _pending_flow.authorization_url(prompt="consent", access_type="offline")
     return auth_url
 
 
 def exchange_code(code: str, session: Session) -> GoogleToken:
-    flow = _flow()
+    global _pending_flow
+    if not _pending_flow:
+        raise ValueError("No hay flow OAuth pendiente — visita /oauth/init primero")
+    flow = _pending_flow
+    _pending_flow = None
     flow.fetch_token(code=code)
     creds = flow.credentials
 
