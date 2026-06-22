@@ -1,3 +1,5 @@
+import hashlib
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -8,15 +10,12 @@ from googleapiclient.discovery import build
 from sqlmodel import Session, select
 
 from app.config import settings
-from app.modules.calendar.models import GoogleToken
+from app.modules.calendar.models import GoogleToken, OAuthPending
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/calendar.readonly",
 ]
-
-# Single-user: guardamos el flow entre /oauth/init y /oauth/callback
-_pending_flow: Optional[Flow] = None
 
 
 def _build_flow() -> Flow:
@@ -34,20 +33,30 @@ def _build_flow() -> Flow:
     return flow
 
 
-def get_auth_url() -> str:
-    global _pending_flow
-    _pending_flow = _build_flow()
-    auth_url, _ = _pending_flow.authorization_url(prompt="consent", access_type="offline")
+def get_auth_url(session: Session) -> str:
+    flow = _build_flow()
+    auth_url, _ = flow.authorization_url(prompt="consent", access_type="offline")
+
+    # Extraer code_verifier generado por la librería y persistirlo en DB
+    code_verifier = getattr(flow, "code_verifier", None) or getattr(
+        flow.oauth2session, "_code_verifier", None
+    )
+    if code_verifier:
+        session.exec(select(OAuthPending).where(True))  # limpiar pendientes anteriores
+        for old in session.exec(select(OAuthPending)).all():
+            session.delete(old)
+        session.add(OAuthPending(code_verifier=code_verifier))
+        session.commit()
+
     return auth_url
 
 
 def exchange_code(code: str, session: Session) -> GoogleToken:
-    global _pending_flow
-    if not _pending_flow:
-        raise ValueError("No hay flow OAuth pendiente — visita /oauth/init primero")
-    flow = _pending_flow
-    _pending_flow = None
-    flow.fetch_token(code=code)
+    pending = session.exec(select(OAuthPending)).first()
+    code_verifier = pending.code_verifier if pending else None
+
+    flow = _build_flow()
+    flow.fetch_token(code=code, code_verifier=code_verifier)
     creds = flow.credentials
 
     token = session.exec(select(GoogleToken)).first()

@@ -10,8 +10,8 @@ router = APIRouter(prefix="/api/calendar", tags=["calendar"])
 
 
 @router.get("/oauth/init")
-def oauth_init():
-    return RedirectResponse(cal.get_auth_url())
+def oauth_init(session: Session = Depends(get_session)):
+    return RedirectResponse(cal.get_auth_url(session))
 
 
 @router.get("/oauth/callback")

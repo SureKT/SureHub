@@ -13,3 +13,11 @@ class GoogleToken(SQLModel, table=True):
     token_uri: str = "https://oauth2.googleapis.com/token"
     scopes: str = ""
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class OAuthPending(SQLModel, table=True):
+    __tablename__ = "oauth_pending"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code_verifier: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
