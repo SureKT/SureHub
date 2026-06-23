@@ -9,10 +9,16 @@ Stack: FastAPI + SQLModel + SQLite + Telegram bot + Claude API.
 > **Roadmap ("no reinventar la rueda"):** SureHub = **capa de captura+orquestación**, no reimplementa lo ya resuelto. Core propio: bot Telegram, finanzas mínimo. NO construir: Diario (→ Obsidian, módulo retirado), Notas (→ vault Obsidian, captura sin comando), índice/búsqueda IA (→ Khoj). Memoria del bot: solo dashboard web (sin chat conversacional). Finanzas: si piden presupuestos/reglas/multi-cuenta → Firefly III. Detalle/estado en `SureKT/homelab` → `STATE.md`.
 
 ## Comandos
+- Venv: `source .venv/bin/activate` (carpeta es `.venv`, no `venv`). Binario directo: `.venv/bin/python` (el sistema no tiene `python`, solo `python3`)
 - Backend: `uvicorn app.main:app --reload` (desde raíz, venv activado)
 - Bot: `python -m bot.run` (segunda terminal, venv activado)
 - Frontend: `cd frontend && npm run dev` (tercera terminal)
 - Scripts puntuales: `python scripts/<script>.py` (desde raíz, venv activado)
+
+## Operar contra prod (server homelab)
+- SSH: `ssh hub` (alias correcto; `ssh surehub-home` falla auth)
+- DB canónica: `/srv/surehub/data/surehub.db` en el server — **no editar la DB local**, la verdad vive en prod
+- Editar datos desde local sin SSH: API HTTP vía Tailscale `http://surehub-home:8001/api/finance/...`. Verbos: `POST` crear, `PATCH /expenses/{id}` y `PATCH /categories/{id}` editar (NO `PUT`), `DELETE`
 
 ## Estructura
 ```
