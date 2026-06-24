@@ -105,7 +105,11 @@ async def _save_and_reply_note(update: Update, text: str, *, source: str = "tele
     path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, complete_tags, source, settings.TIMEZONE)
     tags = extract_tags(path)
     tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
-    await safe_reply(update,f"{label}: {path.name}{tags_str}")
+    # Eco del texto real (no el filename: está slugificado a ASCII y pierde acentos/ñ)
+    preview = " ".join(text.split())
+    if len(preview) > 60:
+        preview = preview[:59] + "…"
+    await safe_reply(update,f"{label}: {preview}{tags_str}")
 
 
 async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):

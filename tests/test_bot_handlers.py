@@ -88,6 +88,9 @@ class TestMessage:
 
         reply = update.message.reply_text.call_args.args[0]
         assert "Nota guardada:" in reply
+        # El eco usa el texto real, no el filename slugificado (acentos intactos, sin guiones)
+        assert "hola qué tal" in reply
+        assert "-" not in reply.split("Nota guardada:")[1].split(" · ")[0]
         assert list((tmp_path / "inbox").glob("*.md"))
 
     async def test_dot_prefix_short_note(self, monkeypatch, tmp_path):
