@@ -88,11 +88,12 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 **Captura sin comando**
 - Gasto: `descripción cantidad` o `cantidad descripción` → categoría por keywords o botones inline
 - Nota: texto libre (≥2 palabras), prefijo `. idea`, audio 🎤 → `{vault}/inbox/*.md`
-- Comandos ocultos del menú (siguen activos): `/nota`, `/note`, `/borrar`, `/categorias`, `/start`, `/ayuda`
+- Comandos ocultos del menú (siguen activos): `/nota`, `/note`, `/gastosid`, `/borrar`, `/categorias`, `/start`, `/ayuda`
 
 **Consultas y acciones**
 - `/mes` — resumen variable/fijo, variación vs mes anterior, alertas de presupuesto (absorbe el antiguo `/stats`)
-- `/gastos` — últimos 10, o `/gastos mes`
+- `/gastos` — últimos 10, o `/gastos mes` (sin id, lista limpia)
+- `/gastosid` — igual que `/gastos` pero con el id de cada gasto para `/borrar` (oculto del menú, solo en `/help`)
 - `/inbox` — escaneo + digest con botones; job diario a `INBOX_DIGEST_HOUR`
 - `/analisis` — Claude Sonnet sobre finanzas del mes; **confirmación obligatoria** (inline) antes de llamar a la API; fuera del menú por coste
 

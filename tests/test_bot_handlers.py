@@ -214,6 +214,22 @@ class TestGastos:
         assert "Últimos gastos" in reply
         assert "12.50€" in reply
         assert "cine" in reply
+        # /gastos no muestra id (para eso está /gastosid)
+        assert "#" not in reply
+
+    async def test_gastosid_shows_id(self, session):
+        exp = Expense(amount=12.5, description="cine")
+        session.add(exp)
+        session.commit()
+        session.refresh(exp)
+
+        update = make_update()
+        await handlers.cmd_gastosid(update, make_context())
+
+        reply = update.message.reply_text.call_args.args[0]
+        assert f"#{exp.id}" in reply
+        assert "cine" in reply
+        assert "/borrar" in reply
 
 
 class TestVoiceMessage:

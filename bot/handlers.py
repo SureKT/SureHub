@@ -183,6 +183,40 @@ async def cmd_gastos(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_reply(update,header + "\n" + "\n".join(lines), parse_mode="Markdown")
 
 
+async def cmd_gastosid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Como /gastos pero con el id de cada gasto, para usar con /borrar.
+    Oculto del menú de autocompletado; solo aparece en /help."""
+    if not allowed(update):
+        return
+    filter_month = context.args and context.args[0].lower() in ("mes", "month")
+
+    with Session(engine) as session:
+        if filter_month:
+            now = datetime.now(timezone.utc)
+            expenses_raw, total_count = get_expenses_filtered(
+                session, year=now.year, month=now.month,
+                page=1, per_page=15, order="date", asc=False
+            )
+        else:
+            expenses_raw = latest_expenses(session, 10)
+            total_count = len(expenses_raw)
+
+        if not expenses_raw:
+            await safe_reply(update,"Sin gastos registrados.")
+            return
+
+        lines = []
+        for e, cat in expenses_raw:
+            cat_name = cat.name if cat else "—"
+            desc = f" {e.description}" if e.description else ""
+            date = e.date.strftime("%d/%m") if e.date else ""
+            lines.append(f"`#{e.id}`  {date}  *{e.amount:.2f}€*  {cat_name}{desc}")
+
+        header = f"Mes actual ({total_count} gastos):" if filter_month else "Últimos gastos:"
+
+    await safe_reply(update,header + "\n" + "\n".join(lines) + "\n\nBorra con `/borrar <id>`", parse_mode="Markdown")
+
+
 async def cmd_borrar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return

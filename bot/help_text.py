@@ -16,6 +16,7 @@ HELP = (
     "• Nota: texto libre · `. nota corta` · 🎤 audio\n\n"
     "*Finanzas*\n"
     "/gastos — últimos gastos (o `/gastos mes`)\n"
+    "/gastosid — últimos gastos con su id (para `/borrar`)\n"
     "/mes — resumen del mes y variación vs anterior\n"
     "/borrar — eliminar gasto por id\n"
     "/analisis — análisis IA con confirmación (tiene coste)\n\n"

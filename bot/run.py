@@ -20,7 +20,7 @@ async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE):
 import app.models  # noqa: F401 — registers all models before create_db
 from bot.help_text import bot_commands
 from bot.handlers import (
-    start, cmd_help, message, voice_message, unsupported_message, cmd_gastos, cmd_borrar,
+    start, cmd_help, message, voice_message, unsupported_message, cmd_gastos, cmd_gastosid, cmd_borrar,
     callback_borrar, callback_categoria, callback_analisis, cmd_mes, cmd_categorias, cmd_analisis, cmd_nota,
 )
 from bot.inbox_handlers import cmd_inbox, callback_inbox, inbox_digest_job
@@ -45,6 +45,7 @@ def main():
     app.add_handler(CommandHandler("ayuda", cmd_help))
     app.add_handler(CommandHandler("comandos", cmd_help))
     app.add_handler(CommandHandler("gastos", cmd_gastos))
+    app.add_handler(CommandHandler("gastosid", cmd_gastosid))
     app.add_handler(CommandHandler("borrar", cmd_borrar))
     app.add_handler(CommandHandler("mes", cmd_mes))
     app.add_handler(CommandHandler("categorias", cmd_categorias))
