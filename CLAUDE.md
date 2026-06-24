@@ -87,7 +87,7 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 
 **Captura sin comando**
 - Gasto: `descripción cantidad` o `cantidad descripción` → categoría por keywords o botones inline
-- Nota: texto libre (≥2 palabras), prefijo `. idea`, audio 🎤 → `{vault}/inbox/*.md`
+- Nota: texto libre (≥2 palabras), prefijo `. idea`, audio 🎤 → `{vault}/inbox/*.md`. Feedback: header con emoji (`📝` texto / `🎤` voz) + eco del texto + tags en línea aparte (`🏷️ Tags:` o `🏷️ sin tags`)
 - Comandos ocultos del menú (siguen activos): `/nota`, `/note`, `/gastosid`, `/borrar`, `/categorias`, `/start`, `/ayuda`
 
 **Consultas y acciones**
