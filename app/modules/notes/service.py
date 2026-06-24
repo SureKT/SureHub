@@ -37,7 +37,11 @@ def _parse_tags(raw: str) -> list[str]:
 
     tags: list[str] = []
     for c in candidates:
-        tag = re.sub(r"[^a-z0-9/-]+", "-", c.strip().strip("\"'#").lower()).strip("-")
+        # \w (unicode) conserva acentos, ñ y otras letras; solo espacios y puntuación
+        # se colapsan a '-'. El '/' se mantiene para tags anidados de Obsidian.
+        cleaned = c.strip().strip("\"'#").lower().replace("_", "-")
+        tag = re.sub(r"[^\w/-]+", "-", cleaned)
+        tag = re.sub(r"-{2,}", "-", tag).strip("-")
         if tag and tag not in tags:
             tags.append(tag)
     return tags[:MAX_TAGS]

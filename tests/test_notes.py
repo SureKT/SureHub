@@ -25,6 +25,15 @@ def test_create_note_with_tags(tmp_path):
     assert extract_tags(path) == ["ideas", "app"]
 
 
+def test_tags_preservan_acentos_y_enes():
+    # Haiku devuelve tags con acentos/ñ/especiales → no deben volverse guiones
+    def llm(prompt: str) -> str:
+        return '["comunión", "Niñez", "trabajo/proyecto", "año nuevo"]'
+
+    tags = generate_tags("texto suficientemente largo para clasificar", llm)
+    assert tags == ["comunión", "niñez", "trabajo/proyecto", "año-nuevo"]
+
+
 def test_short_note_skips_llm(tmp_path):
     called = []
 
