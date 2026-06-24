@@ -100,16 +100,17 @@ def note_text_from_message(text: str) -> str | None:
     return None
 
 
-async def _save_and_reply_note(update: Update, text: str, *, source: str = "telegram", label: str = "Nota guardada"):
+async def _save_and_reply_note(update: Update, text: str, *, source: str = "telegram", label: str = "Nota guardada", icon: str = "📝"):
     await update.message.reply_chat_action("typing")
     path = await asyncio.to_thread(create_note, text, settings.OBSIDIAN_VAULT_PATH, complete_tags, source, settings.TIMEZONE)
     tags = extract_tags(path)
-    tags_str = f" · tags: {', '.join(tags)}" if tags else " · sin tags"
+    tags_line = f"🏷️ Tags: {', '.join(tags)}" if tags else "🏷️ _sin tags_"
     # Eco del texto real (no el filename: está slugificado a ASCII y pierde acentos/ñ)
     preview = " ".join(text.split())
     if len(preview) > 60:
         preview = preview[:59] + "…"
-    await safe_reply(update,f"{label}: {preview}{tags_str}")
+    msg = f"{icon} *{label}*\n{preview}\n\n{tags_line}"
+    await safe_reply(update, msg, parse_mode="Markdown")
 
 
 async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -136,7 +137,7 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_reply(update,"El audio no tenía texto reconocible.")
         return
 
-    await _save_and_reply_note(update, text, source="telegram-voice", label="Nota guardada (voz)")
+    await _save_and_reply_note(update, text, source="telegram-voice", label="Nota guardada (voz)", icon="🎤")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):

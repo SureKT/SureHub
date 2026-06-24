@@ -87,10 +87,13 @@ class TestMessage:
         await handlers.message(update, make_context())
 
         reply = update.message.reply_text.call_args.args[0]
-        assert "Nota guardada:" in reply
-        # El eco usa el texto real, no el filename slugificado (acentos intactos, sin guiones)
-        assert "hola qué tal" in reply
-        assert "-" not in reply.split("Nota guardada:")[1].split(" · ")[0]
+        assert "Nota guardada" in reply
+        # Tags en su propia línea, separadas por salto en blanco (capitalizado / "sin tags")
+        assert "\n\n🏷️" in reply
+        # El eco (línea bajo el header) usa el texto real, no el filename slugificado
+        preview_line = reply.split("\n")[1]
+        assert "hola qué tal" in preview_line
+        assert "-" not in preview_line
         assert list((tmp_path / "inbox").glob("*.md"))
 
     async def test_dot_prefix_short_note(self, monkeypatch, tmp_path):
@@ -99,7 +102,7 @@ class TestMessage:
 
         await handlers.message(update, make_context())
 
-        assert "Nota guardada:" in update.message.reply_text.call_args.args[0]
+        assert "Nota guardada" in update.message.reply_text.call_args.args[0]
         content = next((tmp_path / "inbox").glob("*.md")).read_text(encoding="utf-8")
         assert "comprar leche" in content
 
