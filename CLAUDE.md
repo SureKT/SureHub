@@ -75,6 +75,7 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - Telegram polling en local, webhook en prod — cambio en TELEGRAM_MODE
 - Bot y FastAPI corren como procesos separados en local, containers separados en prod (api/bot/frontend vía docker compose en el server)
 - Claude API model: `claude-sonnet-4-6` — cambiar solo si hay razón explícita
+- **Capa LLM vía LiteLLM** — `app/services/llm.py` no llama a la SDK de Anthropic directo; pasa por `app/services/llm_router.py` (tier→modelo + fallback) y cada llamada se loguea en `llm_calls` (SQLite). Tiers: `cloud` (sonnet) y `local_ok` (haiku; Ollama local en Fase 2). Spec: `docs/superpowers/specs/2026-06-26-llm-routing-evals-design.md`
 - No hay historial de conversación en el bot — cada mensaje es independiente (decisión consciente, añadir si el uso real lo justifica)
 - Memoria del bot: módulo SQLite + pantalla Memory en frontend. Ya no hay comandos Telegram; se inyecta solo en `/analisis` si hay hechos guardados
 - Frontend consume API en /api (proxy Vite → FastAPI). En prod, mismo origen
