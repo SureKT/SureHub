@@ -1,9 +1,8 @@
 import os
 
 # Dummy env vars MUST be set before importing anything from app/:
-# Settings has required fields without defaults, app.database creates the
-# engine at import time, and app.services.llm builds the Anthropic client at
-# import time. DATABASE_URL points to in-memory SQLite so no test can ever
+# Settings has required fields without defaults and app.database creates the
+# engine at import time. DATABASE_URL points to in-memory SQLite so no test can ever
 # touch the real surehub.db even through the module-level engine.
 os.environ["ANTHROPIC_API_KEY"] = "test-anthropic-key"
 os.environ["TELEGRAM_BOT_TOKEN"] = "000000:test-telegram-token"
