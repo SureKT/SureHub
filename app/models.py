@@ -3,3 +3,4 @@ from app.modules.finanzas.models import Expense, RecurringExpense, Category  # n
 from app.modules.memoria.models import Memory  # noqa: F401
 from app.modules.inbox.models import InboxItem  # noqa: F401
 from app.modules.calendar.models import GoogleToken, OAuthPending  # noqa: F401
+from app.modules.llm_log.models import LLMCall  # noqa: F401
