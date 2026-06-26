@@ -1,5 +1,12 @@
 # LLM Routing + Evals — Implementation Plan
 
+> **STATUS (2026-06-26): Fase 1 IMPLEMENTADA en rama `feat/llm-routing-evals`.** Las 7 tareas hechas,
+> 209 tests OK, 7 commits `78e6c20`..`ad807bc`. **NO mergeada a `main`.** Gap abierto: la llamada
+> real LiteLLM→Anthropic nunca se validó con `ANTHROPIC_API_KEY` (sin `.env` en el working tree del
+> server; todos los tests mockean litellm). El formato del model-string sí se confirmó
+> (`anthropic/<id>`, AuthError real con request_id). **Validar end-to-end antes de mergear a prod.**
+> Detalle de instalación: litellm 1.89.4 (venv uv-managed, no pip). Fases 2 y 3 pendientes (ver final).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Route SureHub's LLM calls through LiteLLM with per-tier model selection and fallback, logging every call to SQLite — without changing the public interface of `llm.py` or its callers.
