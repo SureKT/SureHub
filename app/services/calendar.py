@@ -12,8 +12,6 @@ CALENDAR_COLORS = {
     "default":   "8",   # Graphite — sin categorizar
 }
 
-SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
-
 
 def _event_body(summary: str, start: str, end: str, all_day: bool, theme: str) -> dict:
     color = CALENDAR_COLORS.get(theme, CALENDAR_COLORS["default"])
@@ -30,13 +28,14 @@ def _event_body(summary: str, start: str, end: str, all_day: bool, theme: str) -
 
 def _service():
     # Imports lazy: las libs Google solo se cargan en runtime, no en tests del body.
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
 
-    creds = Credentials.from_authorized_user_file(settings.GOOGLE_CALENDAR_TOKEN, SCOPES)
-    if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
+    from app.database import get_session
+    from app.modules.calendar.service import get_credentials
+
+    creds = get_credentials(next(get_session()))
+    if not creds:
+        raise ValueError("Google Calendar no conectado (visita /api/calendar/oauth/init)")
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
 
 

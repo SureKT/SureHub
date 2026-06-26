@@ -12,7 +12,9 @@ app/
     parser.py     # input parsing (if applicable)
   services/
     llm.py        # Claude API wrapper (complete_tags=Haiku, complete_event=Sonnet)
-    calendar.py   # Google Calendar wrapper (OAuth token, CALENDAR_COLORS, create_event)
+    calendar.py   # Google Calendar API (CALENDAR_COLORS, all-day, create_event); creds via modules/calendar
+  modules/
+    calendar/     # OAuth web flow + token in SQLite (GoogleToken); get_credentials for services/calendar.py
   routers/
     finanzas.py   # REST endpoints per module
   config.py       # Settings from .env
@@ -47,7 +49,7 @@ docs/             # architecture and specs
 
 **Claude models** — Sonnet (`LLM_MODEL`) for `/analisis` and inbox event date extraction (`extract_event`); Haiku (`TAG_MODEL`) for note tags and inbox classification.
 
-**Inbox events → Google Calendar** — notes classified as `event` get a Sonnet date/duration/theme extraction (2nd LLM call, only for events). Approval is per-event in the digest; `create_event` (`services/calendar.py`) inserts into Google Calendar with a theme color. OAuth token lives in the server volume; generated once via `scripts/google_auth.py`.
+**Inbox events → Google Calendar** — notes classified as `event` get a Sonnet date/duration/theme extraction (2nd LLM call, only for events). Approval is per-event in the digest; `create_event` (`services/calendar.py`) inserts into Google Calendar with a theme color. Auth is split: `modules/calendar/` runs the OAuth **web flow** and stores the token in SQLite (`google_tokens`), exposing `get_credentials`; `services/calendar.py` asks it for live credentials. One-time auth: visit `/api/calendar/oauth/init` through an SSH tunnel to `localhost:8001`.
 
 **Single user, no auth** — personal use only.
 

@@ -1,24 +1,22 @@
-import hashlib
-import os
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
 from sqlmodel import Session, select
 
 from app.config import settings
 from app.modules.calendar.models import GoogleToken, OAuthPending
 
-SCOPES = [
-    "https://www.googleapis.com/auth/calendar.events",
-    "https://www.googleapis.com/auth/calendar.readonly",
-]
+if TYPE_CHECKING:  # solo para type hints; no carga las libs Google en import
+    from google.oauth2.credentials import Credentials
+
+# OAuth scope alineado con app/services/calendar.py (solo escritura de eventos)
+SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
 
-def _build_flow() -> Flow:
+def _build_flow():
+    # Import lazy: las libs Google solo se cargan en runtime, no al importar la app.
+    from google_auth_oauthlib.flow import Flow
+
     client_config = {
         "web": {
             "client_id": settings.GOOGLE_CLIENT_ID,
@@ -82,7 +80,12 @@ def exchange_code(code: str, session: Session) -> GoogleToken:
     return token
 
 
-def _get_credentials(session: Session) -> Optional[Credentials]:
+def get_credentials(session: Session) -> Optional["Credentials"]:
+    """Credenciales Google vivas (refresca si expiraron). Las usa
+    app/services/calendar.py para hablar con la Calendar API."""
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+
     token = session.exec(select(GoogleToken)).first()
     if not token:
         return None
@@ -110,27 +113,3 @@ def _get_credentials(session: Session) -> Optional[Credentials]:
 
 def is_connected(session: Session) -> bool:
     return session.exec(select(GoogleToken)).first() is not None
-
-
-def create_event(
-    session: Session,
-    summary: str,
-    start: str,
-    end: str,
-    description: str = "",
-) -> dict:
-    """
-    start/end: ISO 8601 con timezone, e.g. "2026-06-25T10:00:00"
-    """
-    creds = _get_credentials(session)
-    if not creds:
-        raise ValueError("Google Calendar no conectado")
-
-    service = build("calendar", "v3", credentials=creds)
-    body = {
-        "summary": summary,
-        "description": description,
-        "start": {"dateTime": start, "timeZone": settings.TIMEZONE},
-        "end": {"dateTime": end, "timeZone": settings.TIMEZONE},
-    }
-    return service.events().insert(calendarId="primary", body=body).execute()
