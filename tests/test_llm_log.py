@@ -27,3 +27,10 @@ def test_log_call_persists_row(session):
     assert rows[0].function == "complete_tags"
     assert rows[0].fell_back is False
     assert rows[0].cost_usd == 0.0001
+
+
+def test_llmcall_registered_in_metadata():
+    import app.models  # noqa: F401
+    from sqlmodel import SQLModel
+
+    assert "llm_calls" in SQLModel.metadata.tables
