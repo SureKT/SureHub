@@ -10,7 +10,17 @@ aquí solo hitos si hace falta contexto.
 
 ## En curso
 
-(vacío)
+- [ ] **LLM Routing — Fase 1 validada end-to-end, lista para merge a `main`** (rama
+  `feat/llm-routing-evals`, validada 2026-06-29). Llamada real LiteLLM→Anthropic confirmada con la
+  key de prod (extraída del container `surehub-api-1`): `cloud`→Sonnet y `local_ok`→Haiku devuelven
+  texto, coste y tokens reales. Bug encontrado y corregido: Anthropic resuelve el alias a snapshot
+  con fecha (`claude-haiku-4-5-20251001`), `_base()` lo marcaba como fallback falso → ahora compara
+  con `startswith`. Plan: `docs/superpowers/plans/2026-06-26-llm-routing-evals.md`.
+- [ ] **LLM Routing — Fase 2 (Ollama local)** — instalar Ollama en `surehub-home` (CPU), pull
+  `qwen2.5:3b`, validar `ollama_chat/<model>` + `OLLAMA_BASE_URL`, prepend local a `TIERS["local_ok"]`
+  con timeout, verificar fallback (matar Ollama → cae a Haiku, log `fell_back=true`). Plan propio tras Fase 1.
+- [ ] **LLM Routing — Fase 3 (evals)** — `evals/` (dataset tagging real + `promptfooconfig.yaml`),
+  local vs Haiku vs Sonnet, report + regla de decisión (local accuracy ≥ Haiku−5pp → mantener local).
 
 ## Pendiente — módulos
 
