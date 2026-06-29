@@ -44,6 +44,10 @@ def complete(messages: list[dict], tier: str, max_tokens: int) -> RouterResult:
     latency_ms = int((time.monotonic() - start) * 1000)
 
     served = resp.model
+    # Anthropic resolves an alias (claude-haiku-4-5) to a dated snapshot
+    # (claude-haiku-4-5-20251001), so match by prefix, not equality, or every
+    # Haiku call would look like a fallback.
+    fell_back = not _base(served).startswith(_base(primary))
     try:
         cost = float(litellm.completion_cost(completion_response=resp))
     except Exception:
@@ -53,7 +57,7 @@ def complete(messages: list[dict], tier: str, max_tokens: int) -> RouterResult:
         text=resp.choices[0].message.content,
         model_requested=primary,
         model_served=served,
-        fell_back=_base(served) != _base(primary),
+        fell_back=fell_back,
         input_tokens=resp.usage.prompt_tokens,
         output_tokens=resp.usage.completion_tokens,
         cost_usd=cost,

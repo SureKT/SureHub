@@ -38,6 +38,38 @@ def test_complete_happy_path(monkeypatch):
     assert r.model_served == "claude-haiku-4-5"
 
 
+def test_dated_snapshot_is_not_a_fallback(monkeypatch):
+    # Anthropic resolves the alias to a dated snapshot; that is not a fallback.
+    class _Snap(_FakeResp):
+        model = "claude-haiku-4-5-20251001"
+
+    monkeypatch.setattr(llm_router.litellm, "completion", lambda **k: _Snap())
+    monkeypatch.setattr(llm_router.litellm, "completion_cost", lambda **k: 0.0)
+
+    r = llm_router.complete(
+        messages=[{"role": "user", "content": "x"}],
+        tier="local_ok",
+        max_tokens=128,
+    )
+    assert r.fell_back is False
+    assert r.model_served == "claude-haiku-4-5-20251001"
+
+
+def test_real_fallback_is_detected(monkeypatch):
+    class _Other(_FakeResp):
+        model = "claude-sonnet-4-6"
+
+    monkeypatch.setattr(llm_router.litellm, "completion", lambda **k: _Other())
+    monkeypatch.setattr(llm_router.litellm, "completion_cost", lambda **k: 0.0)
+
+    r = llm_router.complete(
+        messages=[{"role": "user", "content": "x"}],
+        tier="local_ok",
+        max_tokens=128,
+    )
+    assert r.fell_back is True
+
+
 def test_complete_cost_failure_defaults_to_zero(monkeypatch):
     def _boom(**k):
         raise RuntimeError("no pricing")
