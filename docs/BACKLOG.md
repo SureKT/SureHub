@@ -10,12 +10,6 @@ aquí solo hitos si hace falta contexto.
 
 ## En curso
 
-- [ ] **LLM Routing — Fase 1 validada end-to-end, lista para merge a `main`** (rama
-  `feat/llm-routing-evals`, validada 2026-06-29). Llamada real LiteLLM→Anthropic confirmada con la
-  key de prod (extraída del container `surehub-api-1`): `cloud`→Sonnet y `local_ok`→Haiku devuelven
-  texto, coste y tokens reales. Bug encontrado y corregido: Anthropic resuelve el alias a snapshot
-  con fecha (`claude-haiku-4-5-20251001`), `_base()` lo marcaba como fallback falso → ahora compara
-  con `startswith`. Plan: `docs/superpowers/plans/2026-06-26-llm-routing-evals.md`.
 - [ ] **LLM Routing — Fase 2 (Ollama local)** — instalar Ollama en `surehub-home` (CPU), pull
   `qwen2.5:3b`, validar `ollama_chat/<model>` + `OLLAMA_BASE_URL`, prepend local a `TIERS["local_ok"]`
   con timeout, verificar fallback (matar Ollama → cae a Haiku, log `fell_back=true`). Plan propio tras Fase 1.
@@ -36,6 +30,11 @@ aquí solo hitos si hace falta contexto.
 
 ## Hecho
 
+- [x] **LLM Routing — Fase 1** (mergeada + deployada 2026-06-29) — capa LiteLLM (`app/services/llm_router.py`,
+  tier→modelo + fallback) + log SQLite `llm_calls`. `app/services/llm.py` mantiene interfaz. Validada
+  end-to-end contra la API real (cloud→Sonnet, local_ok→Haiku) con la key de prod; corregido falso
+  positivo de `fell_back` por snapshot con fecha. Prod corre con litellm. Spec/plan:
+  `docs/superpowers/{specs,plans}/2026-06-26-llm-routing-evals*`.
 - [x] **Inbox Fase 2** (2026-06-18) — eventos con fecha/hora → Google Calendar (OAuth
   one-time). Categoría `event`, extracción Sonnet (fecha/duración/temática), color por
   temática, tarjeta individual con editar-fecha. Spec:
