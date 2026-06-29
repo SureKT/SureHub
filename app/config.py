@@ -23,19 +23,15 @@ class Settings(BaseSettings):
     WHISPER_LANGUAGE: str = "es"
     WHISPER_CACHE_DIR: str = "/data/.cache/whisper"
 
-    # Google Calendar (OAuth)
+    # Google Calendar — OAuth web flow (token persistido en SQLite, no en fichero)
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://localhost:8001/api/calendar/oauth/callback"
+    GOOGLE_CALENDAR_ID: str = "primary"
 
     # LLM — tags usan Haiku (barato); chat/análisis usan Sonnet
     LLM_MODEL: str = "claude-sonnet-4-6"
     TAG_MODEL: str = "claude-haiku-4-5"
-
-    # Google Calendar (Inbox Fase 2 — eventos)
-    GOOGLE_CALENDAR_CREDENTIALS: str = "./data/google_client_secret.json"
-    GOOGLE_CALENDAR_TOKEN: str = "./data/google_token.json"
-    GOOGLE_CALENDAR_ID: str = "primary"
 
     @property
     def allowed_user_ids(self) -> list[int]:
