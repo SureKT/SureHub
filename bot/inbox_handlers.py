@@ -12,7 +12,7 @@ from app.modules.inbox.service import (
     scan_inbox, pending_items, apply_item, apply_suggested, get_item, apply_event,
     extract_event, _today_str,
 )
-from bot.handlers import allowed, safe_reply
+from bot.handlers import allowed, safe_reply, _edit_or_send
 
 
 def _fmt_when(item) -> str:
@@ -109,14 +109,6 @@ async def cmd_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     for text, kb in messages:
         await safe_reply(update, text, parse_mode="Markdown", reply_markup=kb)
-
-
-async def _edit_or_send(update: Update, query, text: str):
-    from telegram.error import BadRequest
-    try:
-        await query.edit_message_text(text)
-    except BadRequest:
-        await update.effective_chat.send_message(text)
 
 
 async def callback_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
