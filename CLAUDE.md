@@ -72,7 +72,7 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 ## Decisiones de arquitectura
 - **SQLite en local y prod** — prod corre en el server homelab (`surehub-home`), DB canónica en `/srv/surehub/data/surehub.db`. `DATABASE_URL` apunta ahí; Postgres descartado por ahora (uso personal, SQLite sobra)
 - **DB canónica = server**. El PC ya no corre SureHub (no arrancar `bot.run` en local con el mismo token → conflicto polling)
-- Telegram polling en local, webhook en prod — cambio en TELEGRAM_MODE
+- Telegram siempre en polling (local y prod) — el modo webhook nunca se implementó; no arrancar el bot en local con el token de prod (conflicto de polling)
 - Bot y FastAPI corren como procesos separados en local, containers separados en prod (api/bot/frontend vía docker compose en el server)
 - Claude API model: `claude-sonnet-4-6` — cambiar solo si hay razón explícita
 - **Capa LLM vía LiteLLM** — `app/services/llm.py` no llama a la SDK de Anthropic directo; pasa por `app/services/llm_router.py` (tier→modelo + fallback) y cada llamada se loguea en `llm_calls` (SQLite). Tiers: `cloud` (sonnet) y `local_ok` (haiku; Ollama local en Fase 2). Spec: `docs/superpowers/specs/2026-06-26-llm-routing-evals-design.md`
@@ -125,7 +125,7 @@ scripts/         # scripts de migración y seed (uso puntual, no producción)
 - **Fechas en formato mixto** en la DB: csv con microsegundos (`...00:00:00.000000`), import sin ellos (`...00:00:00`), bot tz-aware (`...+00:00`). `_month_range` devuelve **bounds string** (no `datetime`) para comparar bien con los tres — con bound `datetime` se caían los gastos del día 1 a medianoche (ver `service.py`). No volver a tz-aware ahí
 - Telegram parser detects "description amount" or "amount description" pattern, infers category by keywords
 - Import source values: `telegram`, `manual`, `import`, `recurring`, `csv` (Coda)
-- Gastos recurrentes: `generate_recurring()` vía API `/api/recurrentes/generate` o frontend — no hay `/generar` en Telegram
+- Gastos recurrentes: `generate_recurring()` vía API `/api/finance/recurring/generate` o frontend — no hay `/generar` en Telegram
 - API prefix: `/api/finance` (categories, expenses, summary, evolution, months, import)
 - Ports: backend 8001, frontend 5174
 

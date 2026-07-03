@@ -11,10 +11,12 @@ app/
     service.py    # business logic, receives Session
     parser.py     # input parsing (if applicable)
   services/
-    llm.py        # Claude API wrapper (complete_tags=Haiku, complete_event=Sonnet)
+    llm.py        # LLM entrypoints (chat/complete_tags/complete_event) + call logging
+    llm_router.py # LiteLLM tier→model routing (cloud=Sonnet, local_ok=Haiku) + fallback
     calendar.py   # Google Calendar API (CALENDAR_COLORS, all-day, create_event); creds via modules/calendar
   modules/
     calendar/     # OAuth web flow + token in SQLite (GoogleToken); get_credentials for services/calendar.py
+    llm_log/      # LLMCall model — every LLM call logged to SQLite (llm_calls)
   routers/
     finanzas.py   # REST endpoints per module
   config.py       # Settings from .env
@@ -35,7 +37,7 @@ docs/             # architecture and specs
 
 **SQLite in local and prod** — canonical DB on homelab volume `/srv/surehub/data/surehub.db`. `DATABASE_URL` only.
 
-**Telegram polling in dev, webhook in prod** — swap via `TELEGRAM_MODE`. Bot and FastAPI run as separate processes locally, separate containers in prod.
+**Telegram polling everywhere** — webhook mode was never implemented. Bot and FastAPI run as separate processes locally, separate containers in prod. Never run the bot locally with the prod token (polling conflict).
 
 **No conversation history in bot** — each message is independent. Text/voice either parses as expense/note or gets "No entiendo". No free-form chat.
 
@@ -47,7 +49,7 @@ docs/             # architecture and specs
 
 **Obsidian vault** — `OBSIDIAN_VAULT_PATH`. Bot writes `inbox/*.md`; inbox module moves to `archivo/` or `_descartado/`. Moving the vault requires updating env + Docker mount on server.
 
-**Claude models** — Sonnet (`LLM_MODEL`) for `/analisis` and inbox event date extraction (`extract_event`); Haiku (`TAG_MODEL`) for note tags and inbox classification.
+**Claude models** — Sonnet (`LLM_MODEL`) for `/analisis` and inbox event date extraction (`extract_event`); Haiku (`TAG_MODEL`) for note tags and inbox classification. All calls go through `services/llm_router.py` (LiteLLM, tier→model + fallback) and are logged to the `llm_calls` table (`modules/llm_log`), never straight to the Anthropic SDK.
 
 **Inbox events → Google Calendar** — notes classified as `event` get a Sonnet date/duration/theme extraction (2nd LLM call, only for events). Approval is per-event in the digest; `create_event` (`services/calendar.py`) inserts into Google Calendar with a theme color. Auth is split: `modules/calendar/` runs the OAuth **web flow** and stores the token in SQLite (`google_tokens`), exposing `get_credentials`; `services/calendar.py` asks it for live credentials. One-time auth: visit `/api/calendar/oauth/init` through an SSH tunnel to `localhost:8001`.
 

@@ -17,3 +17,7 @@ playwright-screenshots/
 
 # DB backups locales
 surehub.db.bak*
+
+# Certificados TLS (Tailscale serve) — nunca al repo
+*.crt
+*.key

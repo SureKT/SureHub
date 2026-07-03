@@ -6,10 +6,7 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str
     TELEGRAM_ALLOWED_USER_IDS: str  # "123,456" → parseado a lista
     APP_ENV: str = "local"
-    SECRET_KEY: str = "dev-secret"
     DATABASE_URL: str = "sqlite:///./surehub.db"
-    TELEGRAM_MODE: str = "polling"
-    WEBHOOK_URL: str = ""
     TIMEZONE: str = "Europe/Madrid"  # hora local para timestamps de notas
     INBOX_DIGEST_HOUR: int = 9  # hora local del digest diario de la inbox
 

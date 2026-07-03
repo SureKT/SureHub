@@ -40,7 +40,7 @@ def get_auth_url(session: Session) -> str:
         flow.oauth2session, "_code_verifier", None
     )
     if code_verifier:
-        session.exec(select(OAuthPending).where(True))  # limpiar pendientes anteriores
+        # Limpiar pendientes anteriores: solo puede haber un flow OAuth en curso
         for old in session.exec(select(OAuthPending)).all():
             session.delete(old)
         session.add(OAuthPending(code_verifier=code_verifier))
