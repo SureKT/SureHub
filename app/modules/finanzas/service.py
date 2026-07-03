@@ -58,30 +58,36 @@ def register_expense(session: Session, amount: float, category_id: int = None,
     return expense
 
 
+ORDERABLE_COLUMNS = ("date", "amount", "description", "id")
+
+
 def get_expenses_filtered(session: Session, year: int = None, month: int = None,
                            category_id: int = None, search: str = None,
                            from_str: str = None, to_str: str = None,
                            page: int = 1, per_page: int = 50,
                            order: str = "date", asc: bool = False
                            ) -> tuple[list[tuple[Expense, Category | None]], int]:
-    q = select(Expense)
+    # Bounds como STRING, no datetime — mismo motivo que _month_range: en la DB
+    # conviven tres formatos de fecha y un bound datetime (serializado ".000000")
+    # deja fuera filas del día 1 a medianoche. Ver comentario en _month_range.
+    # Outer join a Category: una sola query en vez de N+1 (una por gasto).
+    q = select(Expense, Category).join(
+        Category, Expense.category_id == Category.id, isouter=True
+    )
 
     if from_str or to_str:
         if from_str:
             d = datetime.fromisoformat(from_str)
-            q = q.where(Expense.date >= d.replace(tzinfo=timezone.utc))
+            q = q.where(Expense.date >= f"{d:%Y-%m-%d} 00:00:00")
         if to_str:
-            h = datetime.fromisoformat(to_str).replace(hour=23, minute=59, second=59)
-            q = q.where(Expense.date <= h.replace(tzinfo=timezone.utc))
+            h = datetime.fromisoformat(to_str)
+            q = q.where(Expense.date <= f"{h:%Y-%m-%d} 23:59:59")
     elif year and month:
-        from_ = datetime(year, month, 1, tzinfo=timezone.utc)
-        days = monthrange(year, month)[1]
-        to = datetime(year, month, days, 23, 59, 59, tzinfo=timezone.utc)
+        from_, to = _month_range(year, month)
         q = q.where(Expense.date >= from_).where(Expense.date <= to)
     elif year:
-        from_ = datetime(year, 1, 1, tzinfo=timezone.utc)
-        to = datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
-        q = q.where(Expense.date >= from_).where(Expense.date <= to)
+        q = q.where(Expense.date >= f"{year:04d}-01-01 00:00:00")
+        q = q.where(Expense.date <= f"{year:04d}-12-31 23:59:59")
 
     if category_id:
         q = q.where(Expense.category_id == category_id)
@@ -91,25 +97,21 @@ def get_expenses_filtered(session: Session, year: int = None, month: int = None,
 
     total = session.exec(select(func.count()).select_from(q.subquery())).first() or 0
 
-    col = getattr(Expense, order, Expense.date)
+    col = getattr(Expense, order if order in ORDERABLE_COLUMNS else "date")
     q = q.order_by(col if asc else col.desc())
     q = q.offset((page - 1) * per_page).limit(per_page)
 
-    expenses = list(session.exec(q).all())
-    result = []
-    for e in expenses:
-        cat = session.get(Category, e.category_id) if e.category_id else None
-        result.append((e, cat))
-    return result, total
+    return list(session.exec(q).all()), total
 
 
 def latest_expenses(session: Session, n: int = 5) -> list[tuple[Expense, Category | None]]:
-    expenses = list(session.exec(select(Expense).order_by(Expense.date.desc()).limit(n)).all())
-    result = []
-    for e in expenses:
-        cat = session.get(Category, e.category_id) if e.category_id else None
-        result.append((e, cat))
-    return result
+    q = (
+        select(Expense, Category)
+        .join(Category, Expense.category_id == Category.id, isouter=True)
+        .order_by(Expense.date.desc())
+        .limit(n)
+    )
+    return list(session.exec(q).all())
 
 
 def _month_range(year: int, month: int) -> tuple[str, str]:

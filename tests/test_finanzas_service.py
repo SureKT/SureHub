@@ -125,6 +125,29 @@ class TestExpenses:
         _, total = get_expenses_filtered(session, year=YEAR)
         assert total == 1
 
+    def test_filter_includes_day1_midnight_mixed_formats(self, session):
+        # En la DB conviven tres formatos de fecha (csv/import/bot). Un bound
+        # datetime serializa ".000000" y deja fuera las filas del día 1 a
+        # medianoche en los otros dos formatos — por eso los bounds son string.
+        raw_dates = (
+            f"{YEAR}-{MONTH:02d}-01 00:00:00",          # import (sin microsegundos)
+            f"{YEAR}-{MONTH:02d}-01 00:00:00.000000",   # csv (con microsegundos)
+            f"{YEAR}-{MONTH:02d}-01 00:00:00+00:00",    # bot (tz-aware)
+        )
+        for d in raw_dates:
+            session.connection().exec_driver_sql(
+                "INSERT INTO expense (amount, date, source) VALUES (10, ?, 'import')",
+                (d,),
+            )
+        session.commit()
+
+        _, total = get_expenses_filtered(session, year=YEAR, month=MONTH)
+        assert total == 3
+        _, total = get_expenses_filtered(
+            session, from_str=f"{YEAR}-01-01", to_str=f"{YEAR}-01-02"
+        )
+        assert total == 3
+
     def test_filter_by_date_range(self, session):
         _expense(session, 10, day=5)
         _expense(session, 20, day=20)
