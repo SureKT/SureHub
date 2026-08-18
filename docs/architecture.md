@@ -29,7 +29,7 @@ bot/
   help_text.py        # /help + Telegram command menu (bot_commands)
   run.py              # bot entrypoint (calls create_db on start)
 frontend/         # React + Vite, proxy /api → localhost:8001
-scripts/          # one-off migration and seed scripts
+scripts/          # initial category seed (one-off migrations are deleted once run)
 docs/             # architecture and specs
 ```
 

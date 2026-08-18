@@ -41,7 +41,7 @@ bot/
   help_text.py   # /help y menú de comandos
   run.py         # arranque del bot (llama a create_db al inicio)
 frontend/        # React + Vite, proxy /api → localhost:8001
-scripts/         # scripts de migración y seed (uso puntual, no producción)
+scripts/         # seed inicial de categorías (los one-off ya ejecutados se borran)
 ```
 
 ## Convenciones
