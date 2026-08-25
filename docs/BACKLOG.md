@@ -10,9 +10,6 @@ aquí solo hitos si hace falta contexto.
 
 ## En curso
 
-- [ ] **LLM Routing — Fase 2 (Ollama local)** — instalar Ollama en `surehub-home` (CPU), pull
-  `qwen2.5:3b`, validar `ollama_chat/<model>` + `OLLAMA_BASE_URL`, prepend local a `TIERS["local_ok"]`
-  con timeout, verificar fallback (matar Ollama → cae a Haiku, log `fell_back=true`). Plan propio tras Fase 1.
 - [ ] **LLM Routing — Fase 3 (evals)** — `evals/` (dataset tagging real + `promptfooconfig.yaml`),
   local vs Haiku vs Sonnet, report + regla de decisión (local accuracy ≥ Haiku−5pp → mantener local).
 
@@ -30,6 +27,11 @@ aquí solo hitos si hace falta contexto.
 
 ## Hecho
 
+- [x] **LLM Routing — Fase 2 (Ollama local)** (2026-08-25) — container `ollama` en el server
+  (CPU, red `ollama-net`) + `qwen2.5:3b`. `TIERS["local_ok"]` = local → fallback Haiku, con
+  timeout y fallback manual en el router. Verificado end-to-end: local sirve (`fell_back=false`,
+  coste 0) y con Ollama parado cae a Haiku (`fell_back=true`). Latencia CPU: tags ~1-1,5 s,
+  clasificación ~2-3 s. Infra: `SureKT/homelab` → `docs/ollama.md`.
 - [x] **LLM Routing — Fase 1** (mergeada + deployada 2026-06-29) — capa LiteLLM (`app/services/llm_router.py`,
   tier→modelo + fallback) + log SQLite `llm_calls`. `app/services/llm.py` mantiene interfaz. Validada
   end-to-end contra la API real (cloud→Sonnet, local_ok→Haiku) con la key de prod; corregido falso

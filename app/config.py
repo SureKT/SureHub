@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "claude-sonnet-4-6"
     TAG_MODEL: str = "claude-haiku-4-5"
 
+    # LLM local (Ollama en el server, CPU) para el tier local_ok.
+    # OLLAMA_BASE_URL vacío = tier local_ok 100% cloud: ese es el interruptor,
+    # así dev sin Ollama funciona igual sin una flag aparte.
+    OLLAMA_BASE_URL: str = ""
+    OLLAMA_MODEL: str = "qwen2.5:3b"
+    LLM_LOCAL_TIMEOUT: float = 20.0
+
     @property
     def allowed_user_ids(self) -> list[int]:
         return [int(uid.strip()) for uid in self.TELEGRAM_ALLOWED_USER_IDS.split(",")]
