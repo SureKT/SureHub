@@ -125,6 +125,7 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 - ⚠️ Subs anuales prorrateadas: **no anotar el cargo anual real** cuando caiga en el banco — el recurrente mensual ya lo cubre; anotarlo duplica
 - Reembolsos (bizum recibido) se registran como ajuste negativo en `Varios` (decisión: no construir split-tracking; si crece → Firefly III)
 - **Fechas en formato mixto** en la DB: csv con microsegundos (`...00:00:00.000000`), import sin ellos (`...00:00:00`), bot tz-aware (`...+00:00`). `_month_range` devuelve **bounds string** (no `datetime`) para comparar bien con los tres — con bound `datetime` se caían los gastos del día 1 a medianoche (ver `service.py`). No volver a tz-aware ahí
+- **Campos `datetime` de todos los modelos con `sa_type=DateTime`** (naive). sqlmodel ≥0.0.45 los mapearía a `UTCDateTime`: rechaza naive al escribir (`utcnow`), devuelve aware al leer (rompe `token_expiry` de google-auth) y trata los bounds string de `_month_range` como datetime. Modelo nuevo con fecha → mismo patrón; lo vigila `tests/test_models_datetime.py`
 - Telegram parser detects "description amount" or "amount description" pattern, infers category by keywords
 - Import source values: `telegram`, `manual`, `import`, `recurring`, `csv` (Coda)
 - Gastos recurrentes: `generate_recurring()` vía API `/api/finance/recurring/generate` o frontend — no hay `/generar` en Telegram

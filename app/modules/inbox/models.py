@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import DateTime
 from sqlmodel import SQLModel, Field
 
 
@@ -19,5 +20,5 @@ class InboxItem(SQLModel, table=True):
     theme: str = ""                       # clave de CALENDAR_COLORS
     calendar_event_id: Optional[str] = None
     status: str = "pending"              # pending | approved | archived | discarded | scheduled
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    resolved_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, sa_type=DateTime)
+    resolved_at: Optional[datetime] = Field(default=None, sa_type=DateTime)

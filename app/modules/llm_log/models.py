@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import DateTime
 from sqlmodel import Field, SQLModel
 
 
@@ -7,7 +8,7 @@ class LLMCall(SQLModel, table=True):
     __tablename__ = "llm_calls"
 
     id: int | None = Field(default=None, primary_key=True)
-    ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime)
     function: str
     tier: str
     model_requested: str

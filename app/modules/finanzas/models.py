@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
+from sqlalchemy import DateTime
 from sqlmodel import SQLModel, Field
 
 
@@ -26,5 +27,8 @@ class Expense(SQLModel, table=True):
     recurring_id: Optional[int] = Field(default=None, foreign_key="recurringexpense.id")
     amount: float
     description: Optional[str] = None
-    date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # sa_type=DateTime (naive) en todos los datetime: sqlmodel>=0.0.45 usaría UTCDateTime,
+    # que rechaza naive, devuelve aware y rompe los bounds string de _month_range.
+    # Ver tests/test_models_datetime.py.
+    date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), sa_type=DateTime)
     source: str = "telegram"  # telegram | manual | import | recurring
