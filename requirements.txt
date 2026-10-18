@@ -1,6 +1,9 @@
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
-sqlmodel>=0.0.19
+# Techo hasta migrar: SQLAlchemy 2.1 + sqlmodel 0.0.48 rompen 50 tests (comparar columnas
+# datetime con bounds string, ver _month_range en finanzas). Subirlos es una tarea aparte.
+sqlmodel>=0.0.19,<0.0.39
+sqlalchemy>=2.0,<2.1
 pydantic-settings>=2.2.0
 anthropic>=0.28.0
 python-telegram-bot[job-queue]>=21.0
