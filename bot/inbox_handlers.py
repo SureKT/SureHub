@@ -10,7 +10,7 @@ from app.services.llm import complete_tags, complete_event
 from app.services.calendar import create_event as cal_create_event
 from app.modules.inbox.service import (
     scan_inbox, pending_items, apply_item, apply_suggested, get_item, apply_event,
-    extract_event, _today_str,
+    extract_event, load_event_context, _today_str,
 )
 from bot.handlers import allowed, safe_reply, _edit_or_send
 
@@ -182,7 +182,7 @@ async def reextract_event_date(update: Update, item_id: int, text: str) -> bool:
         item = get_item(session, item_id)
         if not item or item.status != "pending":
             return False
-        data = extract_event(text, _today_str(), complete_event)
+        data = extract_event(text, _today_str(), complete_event, load_event_context(settings.OBSIDIAN_VAULT_PATH))
         if not data:
             await safe_reply(update, "No pude entender la fecha. Prueba de nuevo o usa los botones.")
             return True

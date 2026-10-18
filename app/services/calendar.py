@@ -4,7 +4,7 @@ from app.config import settings
 
 # Mapeo temática → colorId de Google Calendar (eventColors). Editable a mano.
 CALENDAR_COLORS = {
-    "coach":     "3",   # Grape    — Diana/coach
+    "coach":     "3",   # Grape    — coaching
     "formacion": "4",   # Flamingo — clase IA / proyectos de trabajo
     "social":    "5",   # Banana   — ocio con amigos
     "gimnasio":  "9",   # Blueberry — entreno rutinario

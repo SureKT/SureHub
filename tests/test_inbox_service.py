@@ -10,6 +10,7 @@ from app.modules.inbox.service import (
     get_item,
     extract_event,
     apply_event,
+    load_event_context,
 )
 
 
@@ -195,6 +196,34 @@ def test_extract_event_missing_start_returns_none():
     assert extract_event("x", "2026-06-18", llm) is None
 
 
+EVENT_JSON = '{"summary":"X","start":"2026-06-25","end":"2026-06-25","all_day":true,"theme":"coach"}'
+
+
+def test_extract_event_injects_personal_context():
+    prompts = []
+    llm = lambda p: prompts.append(p) or EVENT_JSON
+    extract_event("x", "2026-06-18", llm, context="- Laura → theme=coach")
+    assert "- Laura → theme=coach" in prompts[0]
+
+
+def test_extract_event_without_context_has_no_personal_block():
+    prompts = []
+    llm = lambda p: prompts.append(p) or EVENT_JSON
+    extract_event("x", "2026-06-18", llm)
+    assert "Contexto personal" not in prompts[0]
+
+
+def test_load_event_context_reads_vault_file(tmp_path):
+    f = tmp_path / "_surehub" / "contexto-eventos.md"
+    f.parent.mkdir()
+    f.write_text("- Laura → theme=coach\n", encoding="utf-8")
+    assert load_event_context(tmp_path) == "- Laura → theme=coach"
+
+
+def test_load_event_context_missing_file_is_empty(tmp_path):
+    assert load_event_context(tmp_path) == ""
+
+
 def test_classify_event_category():
     llm = lambda p: '{"category":"event","proposed_text":"cena con Marc"}'
     assert classify_note("cena con Marc el viernes 21h", llm)[0] == "event"
@@ -211,6 +240,19 @@ def test_scan_event_fills_fields(session, tmp_path):
     assert item.proposed_text == "Pádel con Marc"
     assert item.event_start == "2026-06-20T18:00:00"
     assert item.theme == "padel"
+
+
+def test_scan_event_uses_vault_context(session, tmp_path):
+    _write_note(tmp_path, "2026-06-18-1000-x.md", NOTE)
+    (tmp_path / "_surehub").mkdir()
+    (tmp_path / "_surehub" / "contexto-eventos.md").write_text("- Laura → theme=coach", encoding="utf-8")
+    classify = lambda p: '{"category":"event","proposed_text":"algo"}'
+    prompts = []
+    event_llm = lambda p: prompts.append(p) or EVENT_JSON
+
+    scan_inbox(session, tmp_path, classify, event_llm=event_llm)
+
+    assert "- Laura → theme=coach" in prompts[0]
 
 
 def test_scan_event_extraction_failure_falls_to_uncertain(session, tmp_path):

@@ -37,14 +37,25 @@ EVENT_PROMPT = (
     "- Solo hora de inicio -> end = start + 1 hora.\n"
     "- Sin ninguna hora -> all_day=true.\n"
     "- theme: una de [coach, formacion, social, gimnasio, padel]; si no encaja, 'default'.\n"
-    "Contexto personal para theme y summary:\n"
-    "- Diana / terapia → theme=coach, summary='Terapia'\n"
-    "- Fullpadel / PCV / Pádel Club Valencia / padel / pádel → theme=padel, summary='Pádel'\n"
-    "- Natural Climb / Roco / escalada → theme=gimnasio, summary='Escalada'\n"
+    "- padel / pádel → theme=padel, summary='Pádel'\n"
+    "- escalada → theme=gimnasio, summary='Escalada'\n"
     "- gym / gimnasio → theme=gimnasio, summary='Gimnasio'\n"
-    "- cine / teatro / concierto / cena social / billar / bolera → theme=social\n\n"
+    "- cine / teatro / concierto / cena social / billar / bolera → theme=social\n"
+    "{context}\n"
     "Nota:\n{text}"
 )
+
+# Personas, sitios y citas recurrentes viven en el vault, no en el repo (que es público):
+# el usuario los edita desde Obsidian sin desplegar, y no se filtran datos personales.
+EVENT_CONTEXT_FILE = Path("_surehub") / "contexto-eventos.md"
+
+
+def load_event_context(vault_path) -> str:
+    """Personal theme/summary rules for EVENT_PROMPT. Missing or unreadable → '' (generic rules only)."""
+    try:
+        return (Path(vault_path) / EVENT_CONTEXT_FILE).read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
 
 
 def _parse_classification(raw: str) -> tuple[str, str]:
@@ -96,11 +107,12 @@ def _parse_event(raw: str) -> dict | None:
     }
 
 
-def extract_event(text: str, today: str, llm: Callable[[str], str]) -> dict | None:
+def extract_event(text: str, today: str, llm: Callable[[str], str], context: str = "") -> dict | None:
     """Returns {summary,start,end,all_day,theme} or None on any failure
     (caller treats None as 'not a usable event' → stays uncertain)."""
+    block = f"Contexto personal para theme y summary:\n{context}\n" if context else ""
     try:
-        return _parse_event(llm(EVENT_PROMPT.format(today=today, text=text)))
+        return _parse_event(llm(EVENT_PROMPT.format(today=today, text=text, context=block)))
     except Exception:
         return None
 
@@ -134,6 +146,7 @@ def scan_inbox(session: Session, vault_path, llm: Callable[[str], str],
     if not inbox.exists():
         return []
     seen = {i.filename for i in session.exec(select(InboxItem)).all()}
+    context = load_event_context(vault_path)
     created: list[InboxItem] = []
     for path in sorted(inbox.glob("*.md")):
         if path.name in seen:
@@ -142,7 +155,7 @@ def scan_inbox(session: Session, vault_path, llm: Callable[[str], str],
         category, proposed = classify_note(body, llm)
         event_fields = {}
         if category == "event":
-            data = extract_event(body, _today_str(), event_llm) if event_llm else None
+            data = extract_event(body, _today_str(), event_llm, context) if event_llm else None
             if data:
                 proposed = data["summary"]
                 event_fields = {

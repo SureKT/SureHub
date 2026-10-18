@@ -70,7 +70,7 @@ Wrapper sobre `google-api-python-client`. Responsabilidad única: crear eventos.
 
 ```python
 CALENDAR_COLORS = {
-    "coach":     "3",   # Grape   — Diana/coach
+    "coach":     "3",   # Grape   — coaching
     "formacion": "4",   # Flamingo — clase IA / proyectos de trabajo
     "social":    "5",   # Banana  — ocio con amigos
     "gimnasio":  "9",   # Blueberry — entreno rutinario
