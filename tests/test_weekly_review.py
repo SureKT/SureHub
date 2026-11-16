@@ -100,7 +100,7 @@ PLAN = json.dumps({"summary": "Foco", "blocks": [
 def world(engine, vault, monkeypatch):
     monkeypatch.setattr(rh, "engine", engine)
     monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [])
-    monkeypatch.setattr(wp, "run_engine", lambda *a, **k: EngineResult(text=PLAN))
+    monkeypatch.setattr(wp, "run_litellm", lambda *a, **k: EngineResult(text=PLAN))
     monkeypatch.setattr(wr, "run_litellm", lambda p, **k: EngineResult(text=STRUCTURED))
     # plan right after the review runs "now" → pin the clock to Sunday evening
     real_execute = rh.execute

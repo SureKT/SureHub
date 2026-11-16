@@ -19,7 +19,7 @@ from pathlib import Path
 from sqlmodel import Session
 
 from app.config import settings
-from app.modules.routines.engines import run_engine
+from app.modules.routines.engines import run_litellm
 from app.modules.routines.models import RoutineRun
 from app.modules.routines.service import Outcome, RunContext, load_json
 from app.services import calendar as calendar_api
@@ -422,7 +422,7 @@ def run(session: Session, ctx: RunContext) -> Outcome:
 
     prompt = build_prompt(start, end, label, inputs, fixed, previous, ctx.correction,
                           movable=movable, earliest=earliest, conventions=conventions)
-    result = run_engine(ctx.engine, prompt, system=SYSTEM, cwd=str(vault), function=KEY)
+    result = run_litellm(prompt, system=SYSTEM, function=KEY)
     proposal = parse_proposal(result.text, start, end, fixed, earliest)
     if not proposal["blocks"]:
         raise ValueError("El modelo no propuso ningún bloque válido")

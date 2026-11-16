@@ -179,7 +179,7 @@ async def cmd_routines(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons = []
         for r in ROUTINES.values():
             when = f"<code>{r.cron}</code>" if r.cron else "bajo demanda"
-            lines.append(f"• <b>{html.escape(r.name)}</b> — {when} ({r.engine})")
+            lines.append(f"• <b>{html.escape(r.name)}</b> — {when}")
             buttons.append([InlineKeyboardButton(f"▶️ {r.name}", callback_data=f"rt:run:{r.key}")])
         runs = list_runs(session, limit=5)
         if runs:

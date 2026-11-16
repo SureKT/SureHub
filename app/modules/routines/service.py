@@ -17,7 +17,6 @@ logger = logging.getLogger("surehub.routines")
 class RunContext:
     now: datetime                        # tz-aware, routine timezone
     trigger: str
-    engine: str = "litellm"
     parent: Optional[RoutineRun] = None  # previous run when regenerating (adjust)
     correction: Optional[str] = None
     options: dict = field(default_factory=dict)   # manual-run arguments (e.g. /plan semana)
@@ -37,7 +36,6 @@ class Routine:
     description: str
     cron: Optional[str]                  # crontab, 5 fields, in `timezone`; None = only triggered
     timezone: str
-    engine: str                          # litellm | claude_code
     run: Callable[[Session, RunContext], Outcome]
     # If the bot was down at fire time (deploy, restart), run on startup as long
     # as we're within this many hours of the missed fire. 0 = no catch-up.
@@ -59,14 +57,14 @@ def execute(session: Session, routine: Routine, trigger: str, *, now: datetime |
     """Run a routine and persist the run. Never raises: failures end as status=failed
     so the caller can alert instead of losing the error in a job thread."""
     now = now or datetime.now(ZoneInfo(routine.timezone))
-    run = RoutineRun(routine_key=routine.key, trigger=trigger, engine=routine.engine,
+    run = RoutineRun(routine_key=routine.key, trigger=trigger,
                      parent_run_id=parent.id if parent else None)
     session.add(run)
     session.commit()
     session.refresh(run)
 
     try:
-        outcome = routine.run(session, RunContext(now=now, trigger=trigger, engine=routine.engine, parent=parent,
+        outcome = routine.run(session, RunContext(now=now, trigger=trigger, parent=parent,
                                                   correction=correction, options=options or {}))
         run.status = outcome.status
         run.output = json.dumps(outcome.output, ensure_ascii=False)

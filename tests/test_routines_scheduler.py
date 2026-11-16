@@ -15,7 +15,7 @@ TZ = ZoneInfo("Europe/Madrid")
 
 def _routine(run=None, cron="0 19 * * sun", catch_up_hours=14):
     return Routine(key="test", name="Test", description="", cron=cron, timezone="Europe/Madrid",
-                   engine="litellm", run=run or (lambda s, ctx: Outcome(output={"ok": 1})),
+                   run=run or (lambda s, ctx: Outcome(output={"ok": 1})),
                    catch_up_hours=catch_up_hours)
 
 
@@ -43,7 +43,6 @@ def test_execute_success_persists_output(session):
     assert run.status == "succeeded"
     assert run.output == '{"ok": 1}'
     assert run.finished_at is not None
-    assert run.engine == "litellm"
 
 
 def test_execute_failure_is_recorded_not_raised(session):
@@ -58,15 +57,13 @@ def test_execute_passes_context_and_supersedes_parent(session):
     seen = {}
 
     def capture(s, ctx):
-        seen.update(trigger=ctx.trigger, correction=ctx.correction, parent=ctx.parent.id,
-                    engine=ctx.engine)
+        seen.update(trigger=ctx.trigger, correction=ctx.correction, parent=ctx.parent.id)
         return Outcome(status="awaiting_approval")
 
     parent = execute(session, _routine(lambda s, c: Outcome(status="awaiting_approval")), "manual")
     child = execute(session, _routine(capture), "adjust", parent=parent, correction="menos pádel")
 
-    assert seen == {"trigger": "adjust", "correction": "menos pádel", "parent": parent.id,
-                    "engine": "litellm"}
+    assert seen == {"trigger": "adjust", "correction": "menos pádel", "parent": parent.id}
     assert child.parent_run_id == parent.id
     session.refresh(parent)
     assert parent.status == "superseded"

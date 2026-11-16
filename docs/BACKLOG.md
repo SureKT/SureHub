@@ -21,7 +21,6 @@ aquí solo hitos si hace falta contexto.
 
 ## Pendiente — mejoras
 
-- [ ] **Rutinas** — pantalla de runs en frontend; activar motor `claude_code` en prod si una rutina lo necesita
 
 - [ ] **Finanzas** — gráficos más ricos (evolución por categoría, comparativa meses)
 - [ ] **App shell** — login + gestión de credenciales/API keys de servicios externos
@@ -30,7 +29,7 @@ aquí solo hitos si hace falta contexto.
 ## Hecho
 
 - [x] **Rutinas + planificación semanal** (2026-11-16) — módulo `routines` genérico (registro en código,
-  runs en SQLite, scheduler en el bot con catch-up, motores litellm/claude_code) + `weekly_plan`
+  runs en SQLite, scheduler en el bot con catch-up, LLM vía litellm) + `weekly_plan`
   (domingo 19:00, `/plan`, aprobación Telegram → Calendar con colores + nota en `_surehub/planificacion/`).
   Después: revisión semanal (domingo 18:00, preguntas desde el vault, nota nueva + resumen) que lanza
   el plan; bloques compartidos con el chat de Claude del móvil vía convención visible en el vault.

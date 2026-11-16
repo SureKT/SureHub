@@ -11,7 +11,6 @@ ROUTINES: dict[str, Routine] = {
         description="Pregunta la revisión por Telegram, guarda la nota y lanza el plan",
         cron="0 18 * * sun",  # same time as the "Revisión semanal" event in Calendar
         timezone=settings.TIMEZONE,
-        engine="litellm",
         run=weekly_review.run,
         catch_up_hours=15,  # Sunday 18:00 missed → still asks until Monday 09:00
     ),
@@ -21,7 +20,6 @@ ROUTINES: dict[str, Routine] = {
         description="Propone la semana en bloques respetando el calendario; aprobación por Telegram",
         cron=None,  # launched after the review (or skip), or /plan
         timezone=settings.TIMEZONE,
-        engine="litellm",
         run=weekly_plan.run,
     ),
 }

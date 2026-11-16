@@ -30,11 +30,11 @@ def world(engine, monkeypatch, tmp_path):
     monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [])
     engine_calls = []
 
-    def fake_engine(name, prompt, **kw):
+    def fake_engine(prompt, **kw):
         engine_calls.append(prompt)
         return EngineResult(text=PROPOSAL, cost_usd=0.01)
 
-    monkeypatch.setattr(wp, "run_engine", fake_engine)
+    monkeypatch.setattr(wp, "run_litellm", fake_engine)
     rh._in_flight.clear()
     return {"engine": engine, "vault": tmp_path, "engine_calls": engine_calls}
 
@@ -268,23 +268,3 @@ async def test_run_button_executes_routine(world):
     await rh.callback_routine(update, ctx)
     assert _runs(world["engine"])[0].trigger == "manual"
     ctx.bot.send_message.assert_awaited()
-
-
-# ── API (read-only history) ─────────────────────────────────────────────────
-
-def test_api_routines_and_runs(client, session):
-    session.add(RoutineRun(routine_key="weekly_plan", status="approved", cost_usd=0.02,
-                           output='{"week": "2026-W48"}', result='{"created": {"0": "e"}}'))
-    session.commit()
-
-    routines = {r["key"]: r for r in client.get("/api/routines").json()}
-    assert routines["weekly_plan"]["last_run"]["status"] == "approved"
-    assert routines["weekly_plan"]["cron"] is None
-    assert routines["weekly_review"]["cron"] == "0 18 * * sun"
-
-    runs = client.get("/api/routines/runs", params={"routine_key": "weekly_plan"}).json()
-    assert len(runs) == 1
-    detail = client.get(f"/api/routines/runs/{runs[0]['id']}").json()
-    assert detail["output"]["week"] == "2026-W48"
-    assert detail["result"]["created"] == {"0": "e"}
-    assert client.get("/api/routines/runs/999").status_code == 404

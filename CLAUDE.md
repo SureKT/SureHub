@@ -31,7 +31,6 @@ app/
     llm.py       # wrapper Claude API
   routers/
     finanzas.py  # endpoints REST del módulo finanzas
-    routines.py  # historial de rutinas (solo lectura)
   config.py      # Settings desde .env
   database.py    # engine, get_session, create_db
   models.py      # importa todos los modelos (para create_db)
@@ -126,11 +125,10 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 ## Estado actual del módulo Rutinas
 
 - Módulo `app/modules/routines/` + `bot/routine_handlers.py`. Objetivo: rutinas que corren solas en el server (PC apagado) y llegan por Telegram
-- **Definiciones en código** (`registry.py`: `Routine` con cron opcional, tz, motor, `run`, `catch_up_hours`), **solo los runs en BD** (`routine_runs`: trigger, status, output/result JSON, error, coste). Rutina nueva = módulo con `run(session, ctx) -> Outcome` + entrada en `ROUTINES`. `cron=None` = solo se lanza desde otra rutina o a mano
+- **Definiciones en código** (`registry.py`: `Routine` con cron opcional, tz, `run`, `catch_up_hours`), **solo los runs en BD** (`routine_runs`: trigger, status, output/result JSON, error, coste). Rutina nueva = módulo con `run(session, ctx) -> Outcome` + entrada en `ROUTINES`. `cron=None` = solo se lanza desde otra rutina o a mano
 - **Scheduler en el proceso bot** (JobQueue/APScheduler `CronTrigger`), no en FastAPI: el bot tiene Telegram y el vault; un único proceso → sin duplicados. **Catch-up** al arrancar: disparo perdido por deploy/reinicio dentro de `catch_up_hours` sin run desde entonces → se lanza a los 30 s
 - `execute()` nunca lanza: fallo → `status=failed` + aviso ⚠️ por Telegram
-- **Motores** (`engines.py`): `litellm` (default, vía `llm.complete_routine` → `llm_router`, coste logueado) y `claude_code` (`claude -p --output-format json`, tools read-only, `--setting-sources project --strict-mcp-config`, timeout + `--max-budget-usd`). ⚠️ `claude_code` **no funciona en prod** (imagen sin CLI ni credenciales)
-- API solo lectura: `GET /api/routines`, `/api/routines/runs?routine_key=`, `/api/routines/runs/{id}`
+- LLM vía `engines.run_litellm` (→ `llm.complete_routine` → `llm_router`, coste logueado). Sin API REST: el historial se ve con `/routines` en Telegram
 - **Reparto con el chat de Claude del móvil** (que también organiza el calendario vía conector): el server pone el disparo (domingo) y la revisión; ambos planifican y editan los mismos bloques **por igual**, reconocidos por una convención visible, no por metadatos ocultos
 
 **`weekly_review`** (domingo 18:00, catch-up hasta lunes 9:00):

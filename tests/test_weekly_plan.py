@@ -184,14 +184,14 @@ def fake_world(monkeypatch, tmp_path):
     monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [PADEL])
     prompts = []
 
-    def engine(name, prompt, **kw):
+    def engine(prompt, **kw):
         prompts.append(prompt)
         return EngineResult(text=_model([_block("App pádel", "2026-11-23T09:00", "2026-11-23T12:00"),
                                          _block("Gimnasio", "2026-11-24T08:00", "2026-11-24T09:00",
                                                 "gimnasio")]),
                             cost_usd=0.02)
 
-    monkeypatch.setattr(wp, "run_engine", engine)
+    monkeypatch.setattr(wp, "run_litellm", engine)
     return {"vault": vault, "prompts": prompts}
 
 
@@ -218,7 +218,7 @@ def test_run_without_calendar_fails(session, fake_world, monkeypatch):
 
 
 def test_run_with_no_valid_blocks_fails(session, fake_world, monkeypatch):
-    monkeypatch.setattr(wp, "run_engine", lambda *a, **k: EngineResult(text=_model([])))
+    monkeypatch.setattr(wp, "run_litellm", lambda *a, **k: EngineResult(text=_model([])))
     run = execute(session, ROUTINES["weekly_plan"], "manual")
     assert run.status == "failed"
 
@@ -357,7 +357,7 @@ def test_replan_midweek_moves_chat_blocks_and_keeps_identical(session, fake_worl
     keep = _cal_event("ev4", "Dinero: 3 candidaturas", "2026-11-27T12:00:00", "2026-11-27T13:00:00", "8")
     dentist = _cal_event("x1", "Dentista", "2026-11-26T09:30:00", "2026-11-26T10:30:00", "11")
     monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [thu, keep, dentist])
-    monkeypatch.setattr(wp, "run_engine", lambda *a, **k: EngineResult(text=json.dumps({"summary": "s", "blocks": [
+    monkeypatch.setattr(wp, "run_litellm", lambda *a, **k: EngineResult(text=json.dumps({"summary": "s", "blocks": [
         {"title": "App pádel: equilibrar parejas", "start": "2026-11-26T10:30", "end": "2026-11-26T13:00",
          "theme": "formacion", "description": "Algoritmo por nivel"},
         {"title": "Dinero: 3 candidaturas", "start": "2026-11-27T12:00", "end": "2026-11-27T13:00", "theme": "default"},
@@ -397,7 +397,7 @@ def test_replan_appends_section_to_existing_week_note(session, fake_world, monke
     wp.write_note_atomic(fake_world["vault"], "_surehub/planificacion/2026-W48.md", "---\ntipo: plan-semanal\n---\nplan original")
     block = _cal_event("ev3", "App pádel: x", "2026-11-26T09:00:00", "2026-11-26T12:00:00")
     monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [block])
-    monkeypatch.setattr(wp, "run_engine", lambda *a, **k: EngineResult(text=_model([
+    monkeypatch.setattr(wp, "run_litellm", lambda *a, **k: EngineResult(text=_model([
         _block("App pádel: x", "2026-11-26T16:00", "2026-11-26T18:00")])))
     run = execute(session, ROUTINES["weekly_plan"], "manual", now=datetime(2026, 11, 25, 15, 10, tzinfo=TZ))
     monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: ("n1", "l"))
