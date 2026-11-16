@@ -11,7 +11,7 @@ import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.config import settings
 from app.modules.routines.engines import run_engine
@@ -58,14 +58,14 @@ SYSTEM = (
     "Respondes SOLO con un objeto JSON válido, sin texto antes ni después."
 )
 
-PROMPT = """Planifica la semana {label}: del {start} ({start_day}) al {end} ({end_day}). Zona horaria Europe/Madrid.
+PROMPT = """Planifica {span}: del {start} ({start_day}) al {end} ({end_day}). Zona horaria Europe/Madrid.{not_before}
 
 ## Reglas
-- Los eventos existentes son fijos: no los muevas, no los solapes y no los dupliques.
-- Si el día tipo o la rutina base ya está en el calendario, no la repitas. Si no está, NO la recrees bloque a bloque cada día: propón solo lo que cambia esta semana.
-- Propón bloques concretos y accionables: qué proyecto o tarea en cada hueco, candidaturas, formación, deporte puntual, planes sociales que aparezcan en las notas.
-- Respeta los horarios y prioridades del plan activo y de la última revisión semanal si existen.
-- Deja huecos libres: no rellenes cada minuto. Entre 1 y 4 bloques por día laborable suele bastar.
+- Los eventos fijos (incluidos los recurrentes) no se mueven: no los solapes ni los dupliques.
+- Los bloques de trabajo de cada día (proyecto, dinero/candidaturas, aprender) los propones tú siguiendo el día tipo del plan activo, pero encajados alrededor de los eventos fijos: si un evento ocupa la franja habitual, mueve o acorta el bloque en vez de perderlo.
+- Bloques concretos y accionables: qué proyecto o tarea en cada hueco, según tareas pendientes y prioridades de las notas.
+- Respeta las prioridades del plan activo y de la última revisión semanal si existen.
+- Deja huecos libres: no rellenes cada minuto.
 - Títulos cortos en español (máx. 60 caracteres).
 - theme debe ser una de estas claves:
 {themes}
@@ -73,9 +73,9 @@ PROMPT = """Planifica la semana {label}: del {start} ({start_day}) al {end} ({en
 ## Formato de respuesta (JSON)
 {{"summary": "2-4 frases: foco de la semana y por qué", "blocks": [{{"title": "...", "start": "YYYY-MM-DDTHH:MM", "end": "YYYY-MM-DDTHH:MM", "theme": "...", "notes": "opcional, una línea"}}]}}
 
-## Eventos ya en el calendario
+## Eventos fijos en el calendario
 {events}
-
+{current}
 ## Notas del vault
 {inputs}
 """
@@ -90,16 +90,41 @@ ADJUST = """
 Aplica la corrección cambiando solo lo necesario; conserva el resto de bloques tal cual.
 """
 
+CURRENT_PLAN = """
+## Plan vigente (bloques que creó SureHub y siguen sin tocar)
+Son movibles: mantenlos si siguen encajando, muévelos si algo nuevo choca, o quítalos.
+`blocks` debe contener TODO lo que quieras que quede, incluidos los que mantengas igual.
+{blocks}
+"""
+
+SLOT_MINUTES = 30
+
 
 # ── window ──────────────────────────────────────────────────────────────────
 
 def plan_window(now: datetime) -> tuple[date, date, str]:
-    """Days to plan. Sunday evening → whole next week; Monday morning (catch-up) →
-    this whole week; a manual run mid-week → from tomorrow to Sunday."""
-    start = now.date() if now.hour < 12 else now.date() + timedelta(days=1)
+    """Days to plan. Sunday → whole next week (scheduled run, or planning ahead);
+    other days → the rest of this week, from today if there's still afternoon left
+    (replanning mid-week after moving things by hand), otherwise from tomorrow."""
+    today = now.date()
+    if today.weekday() == 6:
+        start = today + timedelta(days=1)
+    elif now.hour < 18:
+        start = today
+    else:
+        start = today + timedelta(days=1)
     end = start + timedelta(days=6 - start.weekday())
     year, week, _ = start.isocalendar()
     return start, end, f"{year}-W{week:02d}"
+
+
+def not_before(now: datetime, start: date) -> datetime:
+    """Earliest time a block may start: next 30-min slot if planning from today."""
+    if start != now.date():
+        return datetime.combine(start, datetime.min.time())
+    naive = now.replace(tzinfo=None, second=0, microsecond=0)
+    extra = (-naive.minute) % SLOT_MINUTES or SLOT_MINUTES
+    return naive + timedelta(minutes=extra)
 
 
 def _fmt_day(d: date) -> str:
@@ -177,14 +202,51 @@ def _fmt_events(events: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def split_events(session: Session, events: list[dict], earliest: datetime) -> tuple[list[dict], list[dict]]:
+    """(fixed, movable). Movable = created by an approved SureHub run, still at the
+    time it was created, and not yet started. A SureHub block the user moved by hand
+    is fixed: moving it was a decision, the plan must respect it."""
+    from app.modules.routines.models import RoutineRun
+
+    run_ids = {int(e["surehub_run"]) for e in events if str(e.get("surehub_run") or "").isdigit()}
+    created_at: dict[str, tuple[str, str]] = {}
+    if run_ids:
+        for run in session.exec(select(RoutineRun).where(RoutineRun.id.in_(run_ids))):
+            blocks = load_json(run.output).get("blocks", [])
+            for idx, event_id in (load_json(run.result).get("created") or {}).items():
+                if int(idx) < len(blocks):
+                    b = blocks[int(idx)]
+                    created_at[event_id] = (b["start"], b["end"])
+
+    fixed, movable = [], []
+    for ev in events:
+        untouched = created_at.get(ev["id"]) == (ev["start"], ev["end"])
+        future = not ev["all_day"] and datetime.fromisoformat(ev["start"]) >= earliest
+        (movable if untouched and future else fixed).append(ev)
+    return fixed, movable
+
+
+def _fmt_current(movable: list[dict]) -> str:
+    if not movable:
+        return ""
+    lines = [f"- {e['start'][:16]} → {e['end'][11:16]}: {e['summary']}" for e in movable]
+    return CURRENT_PLAN.format(blocks="\n".join(lines))
+
+
 def build_prompt(start: date, end: date, label: str, inputs: list[tuple[str, str, str]],
                  events: list[dict], previous: dict | None = None,
-                 correction: str | None = None) -> str:
+                 correction: str | None = None, movable: list[dict] | None = None,
+                 earliest: datetime | None = None) -> str:
     themes = "\n".join(f"  - {k}: {v}" for k, v in THEMES.items())
     notes = "\n\n".join(f"### {lbl} ({rel})\n{content}" for lbl, rel, content in inputs) or "(sin notas)"
-    prompt = PROMPT.format(label=label, start=start.isoformat(), end=end.isoformat(),
+    whole_week = start.weekday() == 0 and (earliest is None or earliest.time() == datetime.min.time())
+    span = f"la semana {label}" if whole_week else f"el resto de la semana {label}"
+    nb = (f"\nAhora son las {earliest:%H:%M} del {earliest:%d/%m}: ningún bloque puede empezar antes."
+          if earliest and earliest.time() != datetime.min.time() else "")
+    prompt = PROMPT.format(span=span, start=start.isoformat(), end=end.isoformat(),
                            start_day=DAYS_ES_LONG[start.weekday()], end_day=DAYS_ES_LONG[end.weekday()],
-                           themes=themes, events=_fmt_events(events), inputs=notes)
+                           not_before=nb, themes=themes, events=_fmt_events(events),
+                           current=_fmt_current(movable or []), inputs=notes)
     if previous is not None and correction:
         prev = {"summary": previous.get("summary", ""), "blocks": previous.get("blocks", [])}
         prompt += ADJUST.format(previous=json.dumps(prev, ensure_ascii=False, indent=1),
@@ -206,7 +268,8 @@ def _overlaps(a_start, a_end, b_start, b_end) -> bool:
     return a_start < b_end and b_start < a_end
 
 
-def parse_proposal(text: str, start: date, end: date, events: list[dict]) -> dict:
+def parse_proposal(text: str, start: date, end: date, events: list[dict],
+                   earliest: datetime | None = None) -> dict:
     """Validate the model output in code instead of trusting the prompt: drop blocks
     that are malformed, outside the window, too long or overlapping real events."""
     data = _extract_json(text)
@@ -230,6 +293,8 @@ def parse_proposal(text: str, start: date, end: date, events: list[dict]) -> dic
             reason = "duración inválida"
         elif not (start <= s.date() <= end):
             reason = "fuera de la semana"
+        elif earliest and s < earliest:
+            reason = "en el pasado"
         elif any(_overlaps(s, e, bs, be) for bs, be in busy):
             reason = "se solapa con un evento existente"
         if reason:
@@ -254,31 +319,44 @@ def run(session: Session, ctx: RunContext) -> Outcome:
     vault = Path(settings.OBSIDIAN_VAULT_PATH)
     previous = load_json(ctx.parent.output) if ctx.parent else None
     if previous:
-        # Adjusting keeps the same week even if the correction arrives the next day.
+        # Adjusting keeps the same window even if the correction arrives later.
         start, end, label = (date.fromisoformat(previous["start"]),
                              date.fromisoformat(previous["end"]), previous["week"])
+        earliest = datetime.fromisoformat(previous["not_before"]) if previous.get("not_before") \
+            else datetime.combine(start, datetime.min.time())
     else:
         start, end, label = plan_window(ctx.now)
+        earliest = not_before(ctx.now, start)
 
     # Calendar is mandatory: planning blind would propose blocks over real events.
     events = calendar_api.list_events(start, end)
+    fixed, movable = split_events(session, events, earliest)
     inputs = read_inputs(vault)
     warnings = []
     if not revision_is_fresh(vault, start):
         warnings.append("No hay revisión semanal reciente: el plan no la tiene en cuenta.")
 
-    prompt = build_prompt(start, end, label, inputs, events, previous, ctx.correction)
+    prompt = build_prompt(start, end, label, inputs, fixed, previous, ctx.correction,
+                          movable=movable, earliest=earliest)
     result = run_engine(ctx.engine, prompt, system=SYSTEM, cwd=str(vault), function=KEY)
-    proposal = parse_proposal(result.text, start, end, events)
+    proposal = parse_proposal(result.text, start, end, fixed, earliest)
     if not proposal["blocks"]:
         raise ValueError("El modelo no propuso ningún bloque válido")
 
     output = {
         "week": label, "start": start.isoformat(), "end": end.isoformat(),
-        "events_considered": len(events), "inputs": [rel for _, rel, _ in inputs],
-        "warnings": warnings, "correction": ctx.correction, **proposal,
+        "not_before": earliest.isoformat(timespec="minutes"),
+        "events_considered": len(fixed), "inputs": [rel for _, rel, _ in inputs],
+        "warnings": warnings, "correction": ctx.correction,
+        "replaces": [{k: ev.get(k) for k in ("id", "summary", "start", "end", "color_id")}
+                     for ev in movable],
+        **proposal,
     }
     return Outcome(status="awaiting_approval", output=output, cost_usd=result.cost_usd)
+
+
+def _same(block: dict, ev: dict) -> bool:
+    return (block["title"], block["start"], block["end"]) == (ev["summary"], ev["start"], ev["end"])
 
 
 # ── rendering ───────────────────────────────────────────────────────────────
@@ -306,7 +384,12 @@ def render_proposal(output: dict) -> str:
         for b in blocks:
             icon = THEME_ICONS.get(b["theme"], "⚫")
             lines.append(f"{icon} {b['start'][11:16]}–{b['end'][11:16]} {esc(b['title'])}")
-    lines.append(f"\n{len(output['blocks'])} bloques · {output.get('events_considered', 0)} eventos existentes respetados")
+    lines.append(f"\n{len(output['blocks'])} bloques · {output.get('events_considered', 0)} eventos fijos respetados")
+    replaces = output.get("replaces") or []
+    if replaces:
+        kept = sum(1 for ev in replaces if any(_same(b, ev) for b in output["blocks"]))
+        lines.append(f"♻️ Reajusta el plan vigente: {kept} bloques se mantienen, "
+                     f"{len(replaces) - kept} se sustituyen")
     if output.get("dropped"):
         lines.append(f"↪️ {len(output['dropped'])} descartados (solapes o formato)")
     for w in output.get("warnings", []):
@@ -317,6 +400,28 @@ def render_proposal(output: dict) -> str:
 
 def note_relpath(week: str) -> str:
     return f"{NOTE_DIR}/{week}.md"
+
+
+def _blocks_markdown(blocks: list[dict]) -> list[str]:
+    lines = []
+    for day, day_blocks in _by_day(blocks).items():
+        d = date.fromisoformat(day)
+        lines.append(f"## {DAYS_ES_LONG[d.weekday()]} {d.day}")
+        for b in day_blocks:
+            extra = f" — {b['notes']}" if b.get("notes") else ""
+            lines.append(f"- {b['start'][11:16]}–{b['end'][11:16]} · {b['title']} `{b['theme']}`{extra}")
+        lines.append("")
+    return lines
+
+
+def replan_section(output: dict, run_id: int) -> str:
+    nb = datetime.fromisoformat(output["not_before"])
+    lines = ["", f"# Reajuste desde {_fmt_day(nb.date())} {nb:%H:%M} (run {run_id})", ""]
+    if output.get("correction"):
+        lines += [f"> Corrección: {output['correction']}", ""]
+    if output.get("summary"):
+        lines += [output["summary"], ""]
+    return "\n".join(lines + _blocks_markdown(output["blocks"]))
 
 
 def note_markdown(output: dict, run_id: int) -> str:
@@ -334,13 +439,7 @@ def note_markdown(output: dict, run_id: int) -> str:
     ]
     if output.get("summary"):
         lines += [output["summary"], ""]
-    for day, blocks in _by_day(output["blocks"]).items():
-        d = date.fromisoformat(day)
-        lines.append(f"## {DAYS_ES_LONG[d.weekday()]} {d.day}")
-        for b in blocks:
-            extra = f" — {b['notes']}" if b.get("notes") else ""
-            lines.append(f"- {b['start'][11:16]}–{b['end'][11:16]} · {b['title']} `{b['theme']}`{extra}")
-        lines.append("")
+    lines += _blocks_markdown(output["blocks"])
     if output.get("warnings"):
         lines += ["## Avisos", *[f"- {w}" for w in output["warnings"]], ""]
     return "\n".join(lines)
@@ -365,45 +464,87 @@ def _save_result(session: Session, run: RoutineRun, result: dict) -> None:
     session.commit()
 
 
+def _theme_for_color(color_id: str | None) -> str:
+    return next((k for k, v in CALENDAR_COLORS.items() if v == color_id), "default")
+
+
 def approve(session: Session, run: RoutineRun, vault: Path) -> dict:
-    """Create the events and the note. Idempotent: each event id is persisted as soon
-    as it exists, so a retry after a partial failure never duplicates events."""
+    """Create the new blocks, then remove the replaced movable ones (create first so a
+    failure never leaves the week empty). Every step is persisted as it happens, so a
+    retry after a partial failure neither duplicates nor re-deletes anything."""
     output = load_json(run.output)
     result = load_json(run.result) or {}
     created: dict[str, str] = result.setdefault("created", {})
+    kept: dict[str, str] = result.setdefault("kept", {})
+    removed: list[dict] = result.setdefault("removed", [])
     run.status = "approving"
     _save_result(session, run, result)
 
+    replaces = output.get("replaces") or []
     for i, b in enumerate(output["blocks"]):
-        if str(i) in created:
+        if str(i) in created or str(i) in kept:
             continue
-        event_id, _ = calendar_api.create_event(
-            b["title"], b["start"], b["end"], False, b["theme"],
-            private={"surehub_run": run.id, "surehub_routine": KEY},
-        )
-        created[str(i)] = event_id
+        same = next((ev for ev in replaces if _same(b, ev) and ev["id"] not in kept.values()), None)
+        if same:
+            kept[str(i)] = same["id"]   # unchanged block: keep the event, no churn
+        else:
+            event_id, _ = calendar_api.create_event(
+                b["title"], b["start"], b["end"], False, b["theme"],
+                private={"surehub_run": run.id, "surehub_routine": KEY},
+            )
+            created[str(i)] = event_id
+        _save_result(session, run, result)
+
+    done = {ev["id"] for ev in removed}
+    for ev in replaces:
+        if ev["id"] in kept.values() or ev["id"] in done:
+            continue
+        calendar_api.delete_event(ev["id"])
+        removed.append(ev)
         _save_result(session, run, result)
 
     rel = note_relpath(output["week"])
-    write_note_atomic(vault, rel, note_markdown(output, run.id))
-    result["note"] = rel
+    if "note" not in result:
+        path = vault / rel
+        if output.get("replaces") and path.exists():
+            previous_note = path.read_text(encoding="utf-8")
+            result["note_previous"] = previous_note
+            content = previous_note.rstrip("\n") + "\n" + replan_section(output, run.id)
+        else:
+            content = note_markdown(output, run.id)
+        write_note_atomic(vault, rel, content)
+        result["note"] = rel
     run.status = "approved"
     _save_result(session, run, result)
     return result
 
 
 def undo(session: Session, run: RoutineRun, vault: Path) -> int:
-    """Delete every event this run created (and its note). Returns how many events."""
+    """Back to the state before approving: delete what this run created, recreate what
+    it replaced, restore the previous note. Returns how many events were deleted."""
     result = load_json(run.result) or {}
     created: dict[str, str] = result.get("created", {})
+    count = result.get("undo_deleted", 0)
     for idx in list(created):
         calendar_api.delete_event(created[idx])
         del created[idx]
-        result.setdefault("deleted", 0)
-        result["deleted"] += 1
+        count += 1
+        result["undo_deleted"] = count
         _save_result(session, run, result)
+
+    removed: list[dict] = result.get("removed", [])
+    while removed:
+        ev = removed[0]
+        calendar_api.create_event(ev["summary"], ev["start"], ev["end"], False,
+                                  _theme_for_color(ev.get("color_id")))
+        removed.pop(0)
+        _save_result(session, run, result)
+
     if result.get("note"):
-        (vault / result["note"]).unlink(missing_ok=True)
+        if result.get("note_previous") is not None:
+            write_note_atomic(vault, result["note"], result["note_previous"])
+        else:
+            (vault / result["note"]).unlink(missing_ok=True)
     run.status = "undone"
     _save_result(session, run, result)
-    return result.get("deleted", 0)
+    return count

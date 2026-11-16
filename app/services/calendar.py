@@ -83,6 +83,7 @@ def _parse_event(raw: dict) -> dict:
         "start": s,
         "end": e,
         "all_day": all_day,
+        "color_id": raw.get("colorId"),
         "surehub_run": private.get("surehub_run"),
     }
 

@@ -15,10 +15,11 @@ from app.services import calendar as calendar_api
 
 ALLOWED_USER_ID = 111
 
-# /plan uses the real clock, so the proposal must land inside today's window.
-_DAY = wp.plan_window(datetime.now(ZoneInfo("Europe/Madrid")))[0].isoformat()
+# /plan uses the real clock: put the block on the window's last day (Sunday) late
+# enough to never be "in the past" whatever time the suite runs.
+_DAY = wp.plan_window(datetime.now(ZoneInfo("Europe/Madrid")))[1].isoformat()
 PROPOSAL = json.dumps({"summary": "Foco", "blocks": [
-    {"title": "App pádel", "start": f"{_DAY}T09:00", "end": f"{_DAY}T12:00", "theme": "formacion"},
+    {"title": "App pádel", "start": f"{_DAY}T20:00", "end": f"{_DAY}T21:30", "theme": "formacion"},
 ]})
 
 

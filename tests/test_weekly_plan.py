@@ -32,11 +32,23 @@ def _model(blocks, summary="Semana de foco en la app"):
 @pytest.mark.parametrize("now,expected", [
     (datetime(2026, 11, 22, 19, tzinfo=TZ), (MON, SUN, "2026-W48")),          # scheduled Sunday
     (datetime(2026, 11, 23, 8, tzinfo=TZ), (MON, SUN, "2026-W48")),           # Monday catch-up
-    (datetime(2026, 11, 25, 15, tzinfo=TZ), (date(2026, 11, 26), SUN, "2026-W48")),  # mid-week manual
+    (datetime(2026, 11, 25, 15, tzinfo=TZ), (date(2026, 11, 25), SUN, "2026-W48")),  # mid-week replan
+    (datetime(2026, 11, 25, 19, tzinfo=TZ), (date(2026, 11, 26), SUN, "2026-W48")),  # evening → tomorrow
+    (datetime(2026, 11, 22, 10, tzinfo=TZ), (MON, SUN, "2026-W48")),          # Sunday morning → next week
     (datetime(2026, 12, 27, 19, tzinfo=TZ), (date(2026, 12, 28), date(2027, 1, 3), "2026-W53")),
 ])
 def test_plan_window(now, expected):
     assert wp.plan_window(now) == expected
+
+
+@pytest.mark.parametrize("now,expected", [
+    (datetime(2026, 11, 25, 15, 10, tzinfo=TZ), datetime(2026, 11, 25, 15, 30)),
+    (datetime(2026, 11, 25, 15, 30, tzinfo=TZ), datetime(2026, 11, 25, 16, 0)),
+    (datetime(2026, 11, 22, 19, tzinfo=TZ), datetime(2026, 11, 23, 0, 0)),   # window starts tomorrow
+])
+def test_not_before(now, expected):
+    start, _, _ = wp.plan_window(now)
+    assert wp.not_before(now, start) == expected
 
 
 # ── vault inputs ────────────────────────────────────────────────────────────
@@ -104,6 +116,14 @@ def test_parse_proposal_validates_in_code():
     assert reasons["sin fechas"] == "formato inválido"
 
 
+def test_blocks_before_now_are_dropped():
+    p = wp.parse_proposal(_model([_block("Tarde", "2026-11-25T15:00", "2026-11-25T16:00"),
+                                  _block("Luego", "2026-11-25T17:00", "2026-11-25T18:00")]),
+                          date(2026, 11, 25), SUN, [], earliest=datetime(2026, 11, 25, 15, 30))
+    assert [b["title"] for b in p["blocks"]] == ["Luego"]
+    assert p["dropped"][0]["reason"] == "en el pasado"
+
+
 def test_all_day_events_do_not_block_slots():
     p = wp.parse_proposal(_model([_block("Trabajo", "2026-11-24T09:00", "2026-11-24T12:00")]),
                           MON, SUN, [BDAY])
@@ -124,6 +144,7 @@ def test_build_prompt_includes_events_inputs_themes_and_correction():
     assert "[creado por SureHub]" in prompt
     assert "- [ ] DNI" in prompt
     assert "padel:" in prompt and "default:" in prompt
+    assert "Plan vigente" not in prompt   # no movable blocks → no section
     assert "mueve el gimnasio al jueves" in prompt
     assert '"title": "X"' in prompt
 
@@ -265,3 +286,95 @@ def test_render_proposal_escapes_and_groups_by_day():
     assert "<b>Lun 23 nov</b>" in text
     assert "🟢 09:00–12:00" in text
     assert "1 descartados" in text and "⚠️ Sin revisión" in text
+
+
+# ── mid-week replanning ─────────────────────────────────────────────────────
+
+def _approved_sunday_plan(session, fake_world, monkeypatch):
+    """Sunday run approved: creates ev1 (Mon 9-12) and ev2 (Tue 8-9)."""
+    run = execute(session, ROUTINES["weekly_plan"], "scheduled",
+                  now=datetime(2026, 11, 22, 19, tzinfo=TZ))
+    ids = iter(["ev1", "ev2"])
+    monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: (next(ids), "l"))
+    wp.approve(session, run, fake_world["vault"])
+    return run
+
+
+def _cal_event(id_, summary, start, end, run_id=None, color="4"):
+    return {"id": id_, "summary": summary, "start": start, "end": end, "all_day": False,
+            "color_id": color, "surehub_run": str(run_id) if run_id else None}
+
+
+def test_split_events_fixed_vs_movable(session, fake_world, monkeypatch):
+    sunday = _approved_sunday_plan(session, fake_world, monkeypatch)
+    events = [
+        PADEL,                                                                     # not SureHub
+        _cal_event("ev1", "App pádel", "2026-11-23T10:00:00", "2026-11-23T13:00:00", sunday.id),  # moved by hand
+        _cal_event("ev2", "Gimnasio", "2026-11-24T08:00:00", "2026-11-24T09:00:00", sunday.id),   # untouched
+        _cal_event("ev9", "Huérfano", "2026-11-24T10:00:00", "2026-11-24T11:00:00", 999),        # unknown run
+    ]
+    fixed, movable = wp.split_events(session, events, datetime(2026, 11, 23, 0, 0))
+    assert [e["id"] for e in movable] == ["ev2"]
+    assert {e["id"] for e in fixed} == {"e1", "ev1", "ev9"}
+
+    # once its time has passed an untouched block is no longer movable
+    _, movable = wp.split_events(session, events, datetime(2026, 11, 24, 12, 0))
+    assert movable == []
+
+
+def test_replan_midweek_replaces_untouched_blocks_and_appends_note(session, fake_world, monkeypatch):
+    sunday = _approved_sunday_plan(session, fake_world, monkeypatch)
+    # Wednesday: Sunday's Thu block is still untouched, a new fixed event appeared
+    thu = _cal_event("ev3", "Proyecto jueves", "2026-11-26T09:00:00", "2026-11-26T12:00:00", sunday.id)
+    keep = _cal_event("ev4", "Candidaturas", "2026-11-27T12:00:00", "2026-11-27T13:00:00", sunday.id, "8")
+    dentist = _cal_event("x1", "Dentista", "2026-11-26T09:30:00", "2026-11-26T10:30:00")
+    sunday.output = json.dumps({**load_json(sunday.output), "blocks": load_json(sunday.output)["blocks"] + [
+        {"title": "Proyecto jueves", "start": "2026-11-26T09:00:00", "end": "2026-11-26T12:00:00", "theme": "formacion"},
+        {"title": "Candidaturas", "start": "2026-11-27T12:00:00", "end": "2026-11-27T13:00:00", "theme": "default"},
+    ]})
+    sunday.result = json.dumps({**load_json(sunday.result),
+                                "created": {**load_json(sunday.result)["created"], "2": "ev3", "3": "ev4"}})
+    session.add(sunday); session.commit()
+    monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [thu, keep, dentist])
+    monkeypatch.setattr(wp, "run_engine", lambda *a, **k: EngineResult(text=_model([
+        _block("Proyecto jueves", "2026-11-26T10:30", "2026-11-26T13:00"),     # moved around the dentist
+        _block("Candidaturas", "2026-11-27T12:00", "2026-11-27T13:00", "default"),  # unchanged
+    ])))
+
+    run = execute(session, ROUTINES["weekly_plan"], "manual", now=datetime(2026, 11, 25, 15, 10, tzinfo=TZ))
+    out = load_json(run.output)
+    assert out["start"] == "2026-11-25" and out["not_before"] == "2026-11-25T15:30"
+    assert {e["id"] for e in out["replaces"]} == {"ev3", "ev4"}
+    assert out["events_considered"] == 1                     # only the dentist is fixed
+    assert "♻️" in wp.render_proposal(out) and "1 bloques se mantienen" in wp.render_proposal(out)
+
+    created, deleted = [], []
+    monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: created.append(a[0]) or ("ev5", "l"))
+    monkeypatch.setattr(calendar_api, "delete_event", deleted.append)
+    result = wp.approve(session, run, fake_world["vault"])
+
+    assert created == ["Proyecto jueves"]                    # unchanged one is kept, not recreated
+    assert deleted == ["ev3"]
+    assert result["kept"] == {"1": "ev4"}
+    note = (fake_world["vault"] / "_surehub/planificacion/2026-W48.md").read_text(encoding="utf-8")
+    assert note.startswith("---\ntipo: plan-semanal")      # original note preserved
+    assert "# Reajuste desde Mié 25 nov 15:30" in note
+
+    # undo: delete new, recreate replaced (same color), restore note
+    recreated = []
+    monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: recreated.append(a) or ("ev6", "l"))
+    deleted.clear()
+    assert wp.undo(session, run, fake_world["vault"]) == 1
+    assert deleted == ["ev5"]
+    assert recreated == [("Proyecto jueves", "2026-11-26T09:00:00", "2026-11-26T12:00:00", False, "formacion")]
+    restored = (fake_world["vault"] / "_surehub/planificacion/2026-W48.md").read_text(encoding="utf-8")
+    assert "Reajuste" not in restored
+
+
+def test_replan_prompt_lists_current_plan_as_movable():
+    movable = [_cal_event("ev2", "Gimnasio", "2026-11-26T08:00:00", "2026-11-26T09:00:00", 1)]
+    prompt = wp.build_prompt(date(2026, 11, 25), SUN, "2026-W48", [], [PADEL], movable=movable,
+                             earliest=datetime(2026, 11, 25, 15, 30))
+    assert "el resto de la semana 2026-W48" in prompt
+    assert "Plan vigente" in prompt and "2026-11-26T08:00 → 09:00: Gimnasio" in prompt
+    assert "15:30 del 25/11" in prompt
