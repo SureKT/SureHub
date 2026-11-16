@@ -124,6 +124,7 @@ def test_parse_proposal_validates_in_code():
         _block("Al revés", "2026-11-24T12:00", "2026-11-24T11:00"),
         _block("Choca consigo", "2026-11-23T11:00", "2026-11-23T13:00"),
         _block("Tema raro", "2026-11-24T10:00", "2026-11-24T11:00", "inventado"),
+        _block("Recordatorio", "2026-11-25T17:00", "2026-11-25T17:15"),
         {"title": "sin fechas"},
     ])
     p = wp.parse_proposal(text, MON, SUN, [PADEL, BDAY])
@@ -135,6 +136,7 @@ def test_parse_proposal_validates_in_code():
     assert reasons["Solapa pádel"] == "se solapa con un evento existente"
     assert reasons["Fuera"] == "fuera de la semana"
     assert reasons["Al revés"] == "duración inválida"
+    assert reasons["Recordatorio"] == "duración inválida"   # < 30 min
     assert reasons["Choca consigo"] == "se solapa con un evento existente"
     assert reasons["sin fechas"] == "formato inválido"
 

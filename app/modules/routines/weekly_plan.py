@@ -24,6 +24,7 @@ KEY = "weekly_plan"
 NOTE_DIR = "_surehub/planificacion"
 MAX_FILE_CHARS = 6000
 MAX_BLOCK_HOURS = 12
+MIN_BLOCK_MINUTES = 30
 
 # (label, glob relative to the vault, mode). Modes: full | open_tasks | active_plan | latest
 VAULT_INPUTS = [
@@ -65,7 +66,8 @@ PROMPT = """Planifica {span}: del {start} ({start_day}) al {end} ({end_day}). Zo
 - Los bloques de trabajo de cada día (proyecto, dinero/candidaturas, aprender) los propones tú siguiendo el día tipo del plan activo, pero encajados alrededor de los eventos fijos: si un evento ocupa la franja habitual, mueve o acorta el bloque en vez de perderlo.
 - Bloques concretos y accionables: qué proyecto o tarea en cada hueco, según tareas pendientes y prioridades de las notas.
 - Respeta las prioridades del plan activo y de la última revisión semanal si existen.
-- Deja huecos libres: no rellenes cada minuto.
+- Deja huecos libres: no rellenes cada minuto. NUNCA crees bloques de pausa, comida, descanso, "libre" ni recordatorios: un hueco sin plan se queda vacío. Si la semana ya está bien cubierta, propón pocos bloques.
+- Cada bloque dura al menos 30 minutos.
 - Títulos cortos en español (máx. 60 caracteres).
 - theme debe ser una de estas claves:
 {themes}
@@ -303,7 +305,7 @@ def parse_proposal(text: str, start: date, end: date, events: list[dict],
         reason = None
         if not title:
             reason = "sin título"
-        elif e <= s or e - s > timedelta(hours=MAX_BLOCK_HOURS):
+        elif e - s < timedelta(minutes=MIN_BLOCK_MINUTES) or e - s > timedelta(hours=MAX_BLOCK_HOURS):
             reason = "duración inválida"
         elif not (start <= s.date() <= end):
             reason = "fuera de la semana"
