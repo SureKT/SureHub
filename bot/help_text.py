@@ -22,6 +22,9 @@ HELP = (
     "/analisis — análisis IA con confirmación (tiene coste)\n\n"
     "*Inbox*\n"
     "/inbox — procesar notas pendientes (digest)\n\n"
+    "*Rutinas*\n"
+    "/plan — proponer la semana en bloques (aprobar → Calendar + nota)\n"
+    "/routines — listar rutinas, últimos runs y lanzarlas\n\n"
     "/start — mensaje de bienvenida"
 )
 
@@ -32,4 +35,5 @@ def bot_commands() -> list[BotCommand]:
         BotCommand("mes", "Resumen del mes"),
         BotCommand("gastos", "Últimos gastos"),
         BotCommand("inbox", "Procesar inbox de notas"),
+        BotCommand("plan", "Planificar la semana"),
     ]

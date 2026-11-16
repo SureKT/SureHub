@@ -4,3 +4,4 @@ from app.modules.memoria.models import Memory  # noqa: F401
 from app.modules.inbox.models import InboxItem  # noqa: F401
 from app.modules.calendar.models import GoogleToken, OAuthPending  # noqa: F401
 from app.modules.llm_log.models import LLMCall  # noqa: F401
+from app.modules.routines.models import RoutineRun  # noqa: F401

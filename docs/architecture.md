@@ -17,6 +17,7 @@ app/
   modules/
     calendar/     # OAuth web flow + token in SQLite (GoogleToken); get_credentials for services/calendar.py
     llm_log/      # LLMCall model — every LLM call logged to SQLite (llm_calls)
+    routines/     # generic routines (registry in code, RoutineRun in DB, engines) + weekly_plan
   routers/
     finanzas.py   # REST endpoints per module
   config.py       # Settings from .env
@@ -26,6 +27,7 @@ app/
 bot/
   handlers.py         # Telegram handlers (capture, finance, analisis)
   inbox_handlers.py   # /inbox digest + callbacks + daily job
+  routine_handlers.py # routine scheduling + catch-up, /plan, /routines, approval callbacks
   help_text.py        # /help + Telegram command menu (bot_commands)
   run.py              # bot entrypoint (calls create_db on start)
 frontend/         # React + Vite, proxy /api → localhost:8001
@@ -41,7 +43,7 @@ docs/             # architecture and specs
 
 **No conversation history in bot** — each message is independent. Text/voice either parses as expense/note or gets "No entiendo". No free-form chat.
 
-**Bot is capture-first** — Telegram command menu is minimal (`help`, `mes`, `gastos`, `inbox`). Notes and expenses work without commands.
+**Bot is capture-first** — Telegram command menu is minimal (`help`, `mes`, `gastos`, `inbox`, `plan`). Notes and expenses work without commands.
 
 **Memory module** — SQLite + frontend UI only. Injected into `/analisis` if facts exist. No `/recuerda` in Telegram.
 
@@ -52,6 +54,8 @@ docs/             # architecture and specs
 **Claude models** — Sonnet (`LLM_MODEL`) for `/analisis` and inbox event date extraction (`extract_event`); Haiku (`TAG_MODEL`) for note tags and inbox classification. All calls go through `services/llm_router.py` (LiteLLM, tier→model + fallback) and are logged to the `llm_calls` table (`modules/llm_log`), never straight to the Anthropic SDK.
 
 **Inbox events → Google Calendar** — notes classified as `event` get a Sonnet date/duration/theme extraction (2nd LLM call, only for events). Approval is per-event in the digest; `create_event` (`services/calendar.py`) inserts into Google Calendar with a theme color. Auth is split: `modules/calendar/` runs the OAuth **web flow** and stores the token in SQLite (`google_tokens`), exposing `get_credentials`; `services/calendar.py` asks it for live credentials. One-time auth: visit `/api/calendar/oauth/init` through an SSH tunnel to `localhost:8001`.
+
+**Routines** — definitions in code (`modules/routines/registry.py`), only runs persisted (`routine_runs`). Scheduled from the **bot** process (JobQueue + APScheduler `CronTrigger`), because delivery/approval live in Telegram and the vault is only mounted in the bot container; one process means no duplicate fires. Startup catch-up re-runs a fire missed by a deploy/restart within `catch_up_hours`. Engines: `litellm` (default) and `claude_code` (headless `claude -p`, not available in prod containers). `weekly_plan` reads vault + Calendar, validates the proposal in code, and only writes Calendar events (tagged with `surehub_run` for undo) and its own note under `_surehub/planificacion/` after explicit approval.
 
 **Single user, no auth** — personal use only.
 

@@ -137,6 +137,8 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_reply(update,"El audio no tenía texto reconocible.")
         return
 
+    if await _maybe_routine_adjustment(update, context, text.strip()):
+        return
     await _save_and_reply_note(update, text, source="telegram-voice", label="Nota guardada (voz)", icon="🎤")
 
 
@@ -394,8 +396,18 @@ async def callback_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_reply(update, response, parse_mode="Markdown")
 
 
+async def _maybe_routine_adjustment(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> bool:
+    run_id = context.user_data.pop("routine_adjust_run_id", None)
+    if run_id is None:
+        return False
+    from bot.routine_handlers import apply_adjustment
+    return await apply_adjustment(update, context, run_id, text)
+
+
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
+        return
+    if await _maybe_routine_adjustment(update, context, update.message.text.strip()):
         return
     edit_id = context.user_data.pop("inbox_edit_id", None)
     if edit_id is not None:

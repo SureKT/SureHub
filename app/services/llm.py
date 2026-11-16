@@ -51,11 +51,15 @@ def _log(function, tier, messages, result, error):
 
 
 def _run(function, tier, messages, max_tokens):
+    return _run_result(function, tier, messages, max_tokens).text
+
+
+def _run_result(function, tier, messages, max_tokens) -> llm_router.RouterResult:
     result = None
     error = None
     try:
         result = llm_router.complete(messages, tier, max_tokens)
-        return result.text
+        return result
     except Exception as e:
         error = str(e)
         raise
@@ -86,3 +90,11 @@ def complete_event(prompt: str) -> str:
     """Date/time extraction for events. Tier cloud (needs the smart model)."""
     messages = [{"role": "user", "content": prompt}]
     return _run("complete_event", "cloud", messages, max_tokens=300)
+
+
+def complete_routine(prompt: str, system: str = "", tier: str = "cloud",
+                     max_tokens: int = 4000, function: str = "routine") -> llm_router.RouterResult:
+    """Routine engine call. Returns the full result so the run can record its cost."""
+    messages = [{"role": "system", "content": system}] if system else []
+    messages.append({"role": "user", "content": prompt})
+    return _run_result(function, tier, messages, max_tokens)

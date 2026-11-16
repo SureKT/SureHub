@@ -24,6 +24,7 @@ from bot.handlers import (
     callback_borrar, callback_categoria, callback_analisis, cmd_mes, cmd_categorias, cmd_analisis, cmd_nota,
 )
 from bot.inbox_handlers import cmd_inbox, callback_inbox, inbox_digest_job
+from bot.routine_handlers import cmd_plan, cmd_routines, callback_routine, schedule_routines
 
 
 async def post_init(app):
@@ -54,6 +55,10 @@ def main():
     app.add_handler(CommandHandler("nota", cmd_nota))
     app.add_handler(CommandHandler("note", cmd_nota))
     app.add_handler(CommandHandler("inbox", cmd_inbox))
+    app.add_handler(CommandHandler("plan", cmd_plan))
+    app.add_handler(CommandHandler("routines", cmd_routines))
+    app.add_handler(CommandHandler("rutinas", cmd_routines))
+    app.add_handler(CallbackQueryHandler(callback_routine, pattern="^rt:"))
     app.add_handler(CallbackQueryHandler(callback_borrar, pattern="^borrar:"))
     app.add_handler(CallbackQueryHandler(callback_categoria, pattern="^cat:"))
     app.add_handler(CallbackQueryHandler(callback_inbox, pattern="^inbox:"))
@@ -72,6 +77,8 @@ def main():
         inbox_digest_job,
         time=dtime(hour=settings.INBOX_DIGEST_HOUR, tzinfo=ZoneInfo(settings.TIMEZONE)),
     )
+
+    schedule_routines(app)
 
     logger.info("Bot arrancado en modo polling...")
     # allowed_updates explícito: Telegram persiste el set entre llamadas a getUpdates;

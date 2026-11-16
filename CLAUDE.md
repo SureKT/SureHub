@@ -31,6 +31,7 @@ app/
     llm.py       # wrapper Claude API
   routers/
     finanzas.py  # endpoints REST del módulo finanzas
+    routines.py  # historial de rutinas (solo lectura)
   config.py      # Settings desde .env
   database.py    # engine, get_session, create_db
   models.py      # importa todos los modelos (para create_db)
@@ -38,6 +39,7 @@ app/
 bot/
   handlers.py    # handlers de Telegram
   inbox_handlers.py  # /inbox, digest, callbacks, job diario
+  routine_handlers.py  # /plan, /routines, scheduler de rutinas, aprobación
   help_text.py   # /help y menú de comandos
   run.py         # arranque del bot (llama a create_db al inicio)
 frontend/        # React + Vite, proxy /api → localhost:8001
@@ -85,18 +87,21 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 
 **Filosofía:** captura sin comando primero. Menú de autocompletado `/` mínimo (4 entradas).
 
-**Menú** (`bot_commands()` en `help_text.py`): `help`, `mes`, `gastos`, `inbox`
+**Menú** (`bot_commands()` en `help_text.py`): `help`, `mes`, `gastos`, `inbox`, `plan`
 
 **Captura sin comando**
 - Gasto: `descripción cantidad` o `cantidad descripción` → categoría por keywords o botones inline
 - Nota: texto libre (≥2 palabras), prefijo `. idea`, audio 🎤 → `{vault}/inbox/*.md`. Feedback: header con emoji (`📝` texto / `🎤` voz) + eco del texto + tags en línea aparte (`🏷️ Tags:` o `🏷️ sin tags`)
-- Comandos ocultos del menú (siguen activos): `/nota`, `/note`, `/gastosid`, `/borrar`, `/categorias`, `/start`, `/ayuda`
+- Comandos ocultos del menú (siguen activos): `/nota`, `/note`, `/gastosid`, `/borrar`, `/categorias`, `/start`, `/ayuda`, `/routines` (`/rutinas`)
+- Si hay un ajuste de rutina pendiente (`✏️ Ajustar`), el siguiente texto o audio es la corrección, no una nota/gasto
 
 **Consultas y acciones**
 - `/mes` — resumen variable/fijo, variación vs mes anterior, alertas de presupuesto (absorbe el antiguo `/stats`)
 - `/gastos` — últimos 10, o `/gastos mes` (sin id, lista limpia)
 - `/gastosid` — igual que `/gastos` pero con el id de cada gasto para `/borrar` (oculto del menú, solo en `/help`)
 - `/inbox` — escaneo + digest con botones; job diario a `INBOX_DIGEST_HOUR`
+- `/plan` — rutina de planificación semanal bajo demanda (ver módulo Rutinas)
+- `/routines` — lista rutinas + últimos runs + botón ▶️ para lanzarlas
 - `/analisis` — Claude Sonnet sobre finanzas del mes; **confirmación obligatoria** (inline) antes de llamar a la API; fuera del menú por coste
 
 **Retirado del bot:** `/recuerda`, `/memoria`, `/olvidar`, `/generar`, `/stats`
@@ -117,6 +122,24 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 - Google Calendar — **dos capas**: auth en `app/modules/calendar/` (OAuth **web flow**, token persistido en SQLite tabla `google_tokens`, refresh automático; expone `get_credentials`) + Calendar API en `app/services/calendar.py` (colores por temática, all-day; su `_service()` pide credenciales a la capa de auth). OAuth one-time: visitar `/api/calendar/oauth/init` vía túnel SSH a `localhost:8001` (Google no acepta IPs; ver redirect URI). Router `app/routers/calendar.py`: `oauth/init`, `oauth/callback`, `status`. Env: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_ID` (default `primary`). ⚠️ App Google en modo **Testing** → token expira a 7 días salvo verificación (en curso)
 - Spec Fase 1: `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`
 - Spec Fase 2 (hecho 2026-06-18): `docs/superpowers/specs/2026-06-18-inbox-calendar-events-design.md`
+
+## Estado actual del módulo Rutinas
+
+- Módulo `app/modules/routines/` + `bot/routine_handlers.py`. Objetivo: rutinas que corren solas en el server (PC apagado) y llegan por Telegram
+- **Definiciones en código** (`registry.py`: `Routine` con cron, tz, motor, `run`, `catch_up_hours`), **solo los runs en BD** (`routine_runs`: trigger, status, output/result JSON, error, coste). Así prompts y horarios se versionan y testean. Rutina nueva = módulo con `run(session, ctx) -> Outcome` + entrada en `ROUTINES`
+- **Scheduler en el proceso bot** (JobQueue/APScheduler `CronTrigger`), no en FastAPI: el bot tiene Telegram y el vault; un único proceso → sin ejecuciones duplicadas. **Catch-up** al arrancar: si un deploy/reinicio se comió el disparo y seguimos dentro de `catch_up_hours` sin run desde entonces, se lanza a los 30 s
+- `execute()` nunca lanza: fallo → `status=failed` + aviso ⚠️ por Telegram
+- **Motores** (`engines.py`): `litellm` (default, vía `llm.complete_routine` → `llm_router`, coste logueado) y `claude_code` (`claude -p --output-format json`, tools read-only, `--setting-sources project --strict-mcp-config` para no cargar hooks/plugins globales, timeout + `--max-budget-usd`). ⚠️ `claude_code` **no funciona en prod**: la imagen no tiene el CLI ni credenciales. Para activarlo: Node + CLI en la imagen + montar `~/.claude` (rw, el token se refresca; ojo con compartirlo con el CLI del host)
+- API solo lectura: `GET /api/routines`, `/api/routines/runs?routine_key=`, `/api/routines/runs/{id}`
+- **`weekly_plan`** (domingo 19:00 Europe/Madrid, catch-up hasta lunes 9:00, + `/plan`):
+  - Entradas (`VAULT_INPUTS`): `Tareas.md` (solo `- [ ]`), `planificacion/*.md` con `estado: activo`, última `planificacion/revisiones/*.md`, `proyecto-propio/_punto-de-partida.md`, `job-search/_dashboard.md`, `_surehub/contexto-eventos.md`. Ignora `.stfolder`, `.stversions`, `.obsidian`, `.trash`, `*.sync-conflict-*`
+  - Ventana: antes de las 12:00 → desde hoy; después → desde mañana; hasta el domingo. Ajustar conserva la semana del run original
+  - Calendar es obligatorio (`list_events`): sin él falla en vez de planificar a ciegas. Validación en código: descarta bloques fuera de la semana, >12 h, mal formados o solapados con eventos con hora (los all-day no bloquean). Temas = claves de `CALENDAR_COLORS`
+  - El prompt pide **no recrear el día tipo** cada semana: la base fija debe vivir como eventos recurrentes en Calendar; la rutina propone solo lo variable
+  - Flujo: propuesta → `✅ Aprobar` / `✏️ Ajustar` (texto o voz → run hijo, el padre queda `superseded`) / `🗑 Descartar`. **Nada se escribe sin aprobar**
+  - Aprobar: crea eventos con `extendedProperties.private.surehub_run` (idempotente: cada id se guarda al crearse, reintentar no duplica) + nota `_surehub/planificacion/AAAA-Wnn.md` (escritura atómica `.syncthing.*.tmp` → `os.replace`). `↩️ Deshacer semana` borra eventos y nota
+  - Aviso en la propuesta si no hay revisión semanal de los últimos días
+- ⚠️ Depende del token de Google Calendar: con la app OAuth en modo Testing caduca a 7 días y el run del domingo fallará (llega el aviso ⚠️)
 
 ## Estado actual del módulo Finanzas
 - Modelos: `Category` (name, type, monthly_estimate, active) + `Expense` (category_id FK, amount, description, date, source) + `RecurringExpense` (name, amount, category_id, day, active)

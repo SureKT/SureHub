@@ -6,6 +6,7 @@ from app.routers.finanzas import router as finance_router
 from app.routers.memoria import router as memory_router
 from app.routers.recurrentes import router as recurring_router
 from app.routers.calendar import router as calendar_router
+from app.routers.routines import router as routines_router
 import app.models  # noqa: F401
 
 
@@ -28,6 +29,7 @@ app.include_router(finance_router)
 app.include_router(memory_router)
 app.include_router(recurring_router)
 app.include_router(calendar_router)
+app.include_router(routines_router)
 
 
 @app.get("/health")
