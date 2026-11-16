@@ -1,5 +1,5 @@
-"""Telegram side of routines: scheduling (JobQueue), /plan, /routines and the
-approval flow (Aprobar / Ajustar / Descartar / Deshacer)."""
+"""Telegram side of routines: scheduling (JobQueue), /routines and the weekly
+review answer flow (Responder / Saltar / reply to the questions message)."""
 import asyncio
 import html
 import json
@@ -16,7 +16,7 @@ from telegram.ext import Application, ContextTypes
 
 from app.config import settings
 from app.database import engine
-from app.modules.routines import weekly_plan, weekly_review
+from app.modules.routines import weekly_review
 from app.modules.routines.models import RoutineRun
 from app.modules.routines.registry import ROUTINES
 from app.modules.routines.service import execute, get_run, list_runs, load_json, needs_catch_up
@@ -24,18 +24,11 @@ from bot.handlers import allowed, safe_reply, _edit_or_send
 
 logger = logging.getLogger("surehub.bot")
 
-ADJUST_KEY = "routine_adjust_run_id"
 REVIEW_KEY = "routine_review_run_id"
 CATCH_UP_DELAY_S = 30
 
-# Runs with a side effect in progress (approve/undo). Single bot process, so an
-# in-memory guard is enough to stop a double tap from creating events twice.
-_in_flight: set[int] = set()
-
 STATUS_ES = {
     "running": "en curso", "succeeded": "ok", "failed": "❌ falló",
-    "awaiting_approval": "⏳ pendiente", "approving": "aplicando", "approved": "✅ aprobada",
-    "discarded": "descartada", "superseded": "reemplazada", "undone": "↩️ deshecha",
     "awaiting_input": "⏳ esperando respuesta", "skipped": "saltada",
 }
 
@@ -44,24 +37,10 @@ def _chat_id() -> int:
     return settings.allowed_user_ids[0]
 
 
-def _proposal_keyboard(run_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("✅ Aprobar", callback_data=f"rt:approve:{run_id}"),
-        InlineKeyboardButton("✏️ Ajustar", callback_data=f"rt:adjust:{run_id}"),
-        InlineKeyboardButton("🗑 Descartar", callback_data=f"rt:discard:{run_id}"),
-    ]])
-
-
 def _review_keyboard(run_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("🎤 Responder", callback_data=f"rt:answer:{run_id}"),
-        InlineKeyboardButton("⏭ Saltar y planificar", callback_data=f"rt:skip:{run_id}"),
-    ]])
-
-
-def _undo_keyboard(run_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("↩️ Deshacer semana", callback_data=f"rt:undo:{run_id}"),
+        InlineKeyboardButton("⏭ Saltar", callback_data=f"rt:skip:{run_id}"),
     ]])
 
 
@@ -70,8 +49,6 @@ def render_run(run: RoutineRun) -> tuple[str, InlineKeyboardMarkup | None]:
     name = html.escape(routine.name if routine else run.routine_key)
     if run.status == "failed":
         return f"⚠️ <b>Rutina «{name}» falló</b>\n<code>{html.escape(run.error or '')[:800]}</code>", None
-    if run.routine_key == weekly_plan.KEY and run.status == "awaiting_approval":
-        return weekly_plan.render_proposal(load_json(run.output)), _proposal_keyboard(run.id)
     if run.routine_key == weekly_review.KEY and run.status == "awaiting_input":
         return weekly_review.render_questions(load_json(run.output)), _review_keyboard(run.id)
     return f"✓ Rutina «{name}»: {STATUS_ES.get(run.status, run.status)}", None
@@ -88,17 +65,13 @@ async def _send(bot, text: str, kb=None):
         return await bot.send_message(chat_id=_chat_id(), text=_plain(text), reply_markup=kb)
 
 
-def _execute_sync(key: str, trigger: str, parent_id: int | None = None,
-                  correction: str | None = None, options: dict | None = None) -> RoutineRun:
+def _execute_sync(key: str, trigger: str) -> RoutineRun:
     with Session(engine) as session:
-        parent = get_run(session, parent_id) if parent_id else None
-        return execute(session, ROUTINES[key], trigger, parent=parent, correction=correction,
-                       options=options)
+        return execute(session, ROUTINES[key], trigger)
 
 
-async def run_and_deliver(bot, key: str, trigger: str, parent_id: int | None = None,
-                          correction: str | None = None, options: dict | None = None) -> RoutineRun:
-    run = await asyncio.to_thread(_execute_sync, key, trigger, parent_id, correction, options)
+async def run_and_deliver(bot, key: str, trigger: str) -> RoutineRun:
+    run = await asyncio.to_thread(_execute_sync, key, trigger)
     text, kb = render_run(run)
     msg = await _send(bot, text, kb)
     if run.status == "awaiting_input" and getattr(msg, "message_id", None):
@@ -132,8 +105,6 @@ async def routine_job(context: ContextTypes.DEFAULT_TYPE):
 
 def schedule_routines(app: Application) -> None:
     for r in ROUTINES.values():
-        if r.trigger() is None:
-            continue
         app.job_queue.run_custom(
             routine_job,
             job_kwargs={"trigger": r.trigger(), "misfire_grace_time": 3600, "coalesce": True},
@@ -153,24 +124,6 @@ def schedule_routines(app: Application) -> None:
 
 # ── commands ────────────────────────────────────────────────────────────────
 
-NEXT_WEEK_ARGS = {"semana", "siguiente", "proxima", "próxima", "next"}
-
-
-def plan_scope(args: list[str]) -> str:
-    return "next" if any(a.lower() in NEXT_WEEK_ARGS for a in args) else "rest"
-
-
-async def cmd_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/plan → replan from now until Sunday · /plan semana → the whole next week."""
-    if not allowed(update):
-        return
-    scope = plan_scope(context.args or [])
-    label = "la semana que viene" if scope == "next" else "desde ahora hasta el domingo"
-    await safe_reply(update, f"🗓 Generando propuesta ({label})…")
-    await update.message.reply_chat_action("typing")
-    await run_and_deliver(context.bot, weekly_plan.KEY, "manual", options={"scope": scope})
-
-
 async def cmd_routines(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
@@ -178,8 +131,7 @@ async def cmd_routines(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines = ["<b>Rutinas</b>"]
         buttons = []
         for r in ROUTINES.values():
-            when = f"<code>{r.cron}</code>" if r.cron else "bajo demanda"
-            lines.append(f"• <b>{html.escape(r.name)}</b> — {when}")
+            lines.append(f"• <b>{html.escape(r.name)}</b> — <code>{r.cron}</code>")
             buttons.append([InlineKeyboardButton(f"▶️ {r.name}", callback_data=f"rt:run:{r.key}")])
         runs = list_runs(session, limit=5)
         if runs:
@@ -192,19 +144,7 @@ async def cmd_routines(update: Update, context: ContextTypes.DEFAULT_TYPE):
                      reply_markup=InlineKeyboardMarkup(buttons))
 
 
-# ── approval flow ───────────────────────────────────────────────────────────
-
-def _approve_sync(run_id: int) -> dict:
-    with Session(engine) as session:
-        run = get_run(session, run_id)
-        return weekly_plan.approve(session, run, Path(settings.OBSIDIAN_VAULT_PATH))
-
-
-def _undo_sync(run_id: int) -> int:
-    with Session(engine) as session:
-        run = get_run(session, run_id)
-        return weekly_plan.undo(session, run, Path(settings.OBSIDIAN_VAULT_PATH))
-
+# ── review answer flow ───────────────────────────────────────────────────────────
 
 def _skip_sync(run_id: int) -> None:
     with Session(engine) as session:
@@ -215,14 +155,6 @@ def _complete_review_sync(run_id: int, text: str) -> dict:
     with Session(engine) as session:
         return weekly_review.complete(session, get_run(session, run_id), text,
                                       Path(settings.OBSIDIAN_VAULT_PATH))
-
-
-def _set_status(run_id: int, status: str) -> None:
-    with Session(engine) as session:
-        run = get_run(session, run_id)
-        run.status = status
-        session.add(run)
-        session.commit()
 
 
 def _status(run_id: int) -> str | None:
@@ -247,9 +179,6 @@ async def callback_routine(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     run_id = int(arg)
-    if run_id in _in_flight:
-        await update.effective_chat.send_message("⏳ Ya se está aplicando, espera.")
-        return
     status = _status(run_id)
 
     if action == "answer":
@@ -266,83 +195,12 @@ async def callback_routine(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await _edit_or_send(update, query, "Esta revisión ya no está pendiente.")
             return
         await asyncio.to_thread(_skip_sync, run_id)
-        await _edit_or_send(update, query, "⏭ Revisión saltada. Preparo el plan…")
-        await run_and_deliver(context.bot, weekly_plan.KEY, "after_review")
-        return
-
-    if action == "approve":
-        if status not in ("awaiting_approval", "approving"):
-            await _edit_or_send(update, query, "Esta propuesta ya no está activa.")
-            return
-        _in_flight.add(run_id)
-        try:
-            result = await asyncio.to_thread(_approve_sync, run_id)
-        except Exception as e:
-            logger.exception("Approve of run %s failed", run_id)
-            await update.effective_chat.send_message(
-                f"⚠️ Error al aplicar ({type(e).__name__}). Lo creado se conserva; "
-                "pulsa ✅ Aprobar otra vez para reintentar sin duplicar.")
-            return
-        finally:
-            _in_flight.discard(run_id)
-        await _edit_or_send(
-            update, query,
-            f"✅ Semana aprobada: {len(result['created'])} eventos en Calendar.\n📝 {result['note']}",
-            reply_markup=_undo_keyboard(run_id),
-        )
-        return
-
-    if action == "adjust":
-        if status != "awaiting_approval":
-            await _edit_or_send(update, query, "Esta propuesta ya no está activa.")
-            return
-        context.user_data[ADJUST_KEY] = run_id
-        await update.effective_chat.send_message("✏️ Envíame la corrección (texto o 🎤 audio).")
-        return
-
-    if action == "discard":
-        if status != "awaiting_approval":
-            await _edit_or_send(update, query, "Esta propuesta ya no está activa.")
-            return
-        await asyncio.to_thread(_set_status, run_id, "discarded")
-        await _edit_or_send(update, query, "🗑 Propuesta descartada.")
-        return
-
-    if action == "undo":
-        if status != "approved":
-            await _edit_or_send(update, query, "No hay nada que deshacer.")
-            return
-        _in_flight.add(run_id)
-        try:
-            n = await asyncio.to_thread(_undo_sync, run_id)
-        except Exception as e:
-            logger.exception("Undo of run %s failed", run_id)
-            await update.effective_chat.send_message(
-                f"⚠️ Error al deshacer ({type(e).__name__}). Pulsa ↩️ otra vez para reintentar.")
-            return
-        finally:
-            _in_flight.discard(run_id)
-        await _edit_or_send(update, query, f"↩️ Semana deshecha: {n} eventos borrados y nota eliminada.")
-
-
-async def apply_adjustment(update: Update, context: ContextTypes.DEFAULT_TYPE,
-                           run_id: int, text: str) -> bool:
-    """Regenerate a pending proposal with the user's correction. False if the run is
-    no longer pending (the text then follows the normal capture path)."""
-    run_status = await asyncio.to_thread(_status, run_id)
-    if run_status != "awaiting_approval":
-        return False
-    with Session(engine) as session:
-        key = get_run(session, run_id).routine_key
-    await safe_reply(update, "🔁 Regenerando con tu corrección…")
-    await update.message.reply_chat_action("typing")
-    await run_and_deliver(context.bot, key, "adjust", parent_id=run_id, correction=text)
-    return True
+        await _edit_or_send(update, query, "⏭ Revisión saltada.")
 
 
 async def apply_review_answer(update: Update, context: ContextTypes.DEFAULT_TYPE,
                               run_id: int, text: str) -> bool:
-    """Save the review answer, send the copy-paste summary, then launch the plan.
+    """Save the review answer and send the summary to paste in the planning chat.
     False if the review is no longer pending (text follows the normal capture path)."""
     if await asyncio.to_thread(_status, run_id) != "awaiting_input":
         return False
@@ -352,8 +210,6 @@ async def apply_review_answer(update: Update, context: ContextTypes.DEFAULT_TYPE
     note = html.escape(out["note"])
     warn = "\n⚠️ No pude ordenarla: guardada tal cual." if out.get("structure_error") else ""
     await _send(context.bot, f"✅ Revisión guardada: <code>{note}</code>{warn}\n\n"
-                             f"<b>Resumen para el chat de planificación</b> (por si el vault no está sincronizado):\n"
+                             f"<b>Resumen para el chat de planificación</b> (pégalo allí):\n"
                              f"<pre>{html.escape(out['summary'])}</pre>")
-    await _send(context.bot, "🗓 Preparando el plan de la semana…")
-    await run_and_deliver(context.bot, weekly_plan.KEY, "after_review")
     return True

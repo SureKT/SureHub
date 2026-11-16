@@ -38,7 +38,7 @@ app/
 bot/
   handlers.py    # handlers de Telegram
   inbox_handlers.py  # /inbox, digest, callbacks, job diario
-  routine_handlers.py  # /plan, /routines, scheduler de rutinas, aprobación
+  routine_handlers.py  # /routines, scheduler de rutinas, respuesta a la revisión
   help_text.py   # /help y menú de comandos
   run.py         # arranque del bot (llama a create_db al inicio)
 frontend/        # React + Vite, proxy /api → localhost:8001
@@ -86,21 +86,20 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 
 **Filosofía:** captura sin comando primero. Menú de autocompletado `/` mínimo (4 entradas).
 
-**Menú** (`bot_commands()` en `help_text.py`): `help`, `mes`, `gastos`, `inbox`, `plan`
+**Menú** (`bot_commands()` en `help_text.py`): `help`, `mes`, `gastos`, `inbox`
 
 **Captura sin comando**
 - Gasto: `descripción cantidad` o `cantidad descripción` → categoría por keywords o botones inline
 - Nota: texto libre (≥2 palabras), prefijo `. idea`, audio 🎤 → `{vault}/inbox/*.md`. Feedback: header con emoji (`📝` texto / `🎤` voz) + eco del texto + tags en línea aparte (`🏷️ Tags:` o `🏷️ sin tags`)
 - Comandos ocultos del menú (siguen activos): `/nota`, `/note`, `/gastosid`, `/borrar`, `/categorias`, `/start`, `/ayuda`, `/routines` (`/rutinas`)
-- Si hay una respuesta de rutina pendiente (`🎤 Responder` de la revisión, reply al mensaje de preguntas, o `✏️ Ajustar` del plan), el siguiente texto o audio es esa respuesta, no una nota/gasto
+- Si hay una respuesta de rutina pendiente (`🎤 Responder` de la revisión o reply al mensaje de preguntas), el siguiente texto o audio es esa respuesta, no una nota/gasto
 
 **Consultas y acciones**
 - `/mes` — resumen variable/fijo, variación vs mes anterior, alertas de presupuesto (absorbe el antiguo `/stats`)
 - `/gastos` — últimos 10, o `/gastos mes` (sin id, lista limpia)
 - `/gastosid` — igual que `/gastos` pero con el id de cada gasto para `/borrar` (oculto del menú, solo en `/help`)
 - `/inbox` — escaneo + digest con botones; job diario a `INBOX_DIGEST_HOUR`
-- `/plan` — replanifica desde ahora hasta el domingo · `/plan semana` — la semana que viene (ver módulo Rutinas). La revisión semanal llega sola el domingo 18:00
-- `/routines` — lista rutinas + últimos runs + botón ▶️ para lanzarlas
+- `/routines` — lista rutinas + últimos runs + botón ▶️ para lanzarlas. La revisión semanal llega sola el domingo 18:00
 - `/analisis` — Claude Sonnet sobre finanzas del mes; **confirmación obligatoria** (inline) antes de llamar a la API; fuera del menú por coste
 
 **Retirado del bot:** `/recuerda`, `/memoria`, `/olvidar`, `/generar`, `/stats`
@@ -125,27 +124,18 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 ## Estado actual del módulo Rutinas
 
 - Módulo `app/modules/routines/` + `bot/routine_handlers.py`. Objetivo: rutinas que corren solas en el server (PC apagado) y llegan por Telegram
-- **Definiciones en código** (`registry.py`: `Routine` con cron opcional, tz, `run`, `catch_up_hours`), **solo los runs en BD** (`routine_runs`: trigger, status, output/result JSON, error, coste). Rutina nueva = módulo con `run(session, ctx) -> Outcome` + entrada en `ROUTINES`. `cron=None` = solo se lanza desde otra rutina o a mano
+- **Definiciones en código** (`registry.py`: `Routine` con cron, tz, `run`, `catch_up_hours`), **solo los runs en BD** (`routine_runs`: trigger, status, output/result JSON, error, coste; columnas `engine`/`parent_run_id` sin uso, se quedan porque existen en prod). Rutina nueva = módulo con `run(session, ctx) -> Outcome` + entrada en `ROUTINES`
 - **Scheduler en el proceso bot** (JobQueue/APScheduler `CronTrigger`), no en FastAPI: el bot tiene Telegram y el vault; un único proceso → sin duplicados. **Catch-up** al arrancar: disparo perdido por deploy/reinicio dentro de `catch_up_hours` sin run desde entonces → se lanza a los 30 s
 - `execute()` nunca lanza: fallo → `status=failed` + aviso ⚠️ por Telegram
 - LLM vía `engines.run_litellm` (→ `llm.complete_routine` → `llm_router`, coste logueado). Sin API REST: el historial se ve con `/routines` en Telegram
-- **Reparto con el chat de Claude del móvil** (que también organiza el calendario vía conector): el server pone el disparo (domingo) y la revisión; ambos planifican y editan los mismos bloques **por igual**, reconocidos por una convención visible, no por metadatos ocultos
+- **Reparto con el chat de Claude del móvil:** el chat planifica y mueve el calendario (conector de Calendar); el server solo aporta lo que el chat no puede: **arrancar solo** el domingo y guardar la revisión. Convención de eventos para el chat en `{vault}/_surehub/convenciones-calendario.md` (nota del usuario)
+- **Decisión (2026-11-16):** hubo un `weekly_plan` (propuesta de bloques → aprobar → Calendar, deshacer) y se eliminó: duplicaba al chat y era la parte cara y arriesgada. Recuperable en git (`2b7ccda`). No reintroducir planificación en el server sin hablarlo antes
 
 **`weekly_review`** (domingo 18:00, catch-up hasta lunes 9:00):
-- Envía las preguntas leídas en vivo de `{vault}/Personal/Revisión semanal.md` (editable en Obsidian; fallback en código) con botones `🎤 Responder` / `⏭ Saltar y planificar`. Run en `awaiting_input` (persistido: sobrevive a reinicios)
+- Envía las preguntas leídas en vivo de `{vault}/Personal/Revisión semanal.md` (editable en Obsidian; fallback en código) con botones `🎤 Responder` / `⏭ Saltar`. Run en `awaiting_input` (persistido: sobrevive a reinicios)
 - Respuesta = siguiente texto/audio tras `Responder`, o **reply** al mensaje de preguntas (`message_id` guardado en `run.result`). Sin pulsar ni responder al mensaje, el texto sigue la captura normal
-- Sonnet ordena la respuesta por pregunta (estilo de la última revisión) → **nota nueva** `planificacion/revisiones/AAAA-MM-DD.md` (nunca sobrescribe: `-2`, `-3`…). Fallo LLM → guarda la respuesta cruda igualmente
-- Manda el **resumen para copiar al chat del móvil** (por si el vault no está sincronizado) y lanza `weekly_plan` (trigger `after_review`)
-
-**`weekly_plan`** (sin cron: tras la revisión, `⏭ Saltar`, o `/plan`):
-- **Convención compartida** en `{vault}/_surehub/convenciones-calendario.md` (se crea una vez, luego es del usuario): título `Área: tarea`, descripción con detalle, colores (3 coach, 4 proyectos/aprender, 5 social, 8 dinero/empleo/revisión/default, 9 gimnasio, 10 pádel/escalada, 11 salud) y sección `## Movibles` con patrones de título (`*: *`, `Gym*`). El server la mete en el prompt y parsea los patrones; el chat la lee del vault
-- **Movible** = sin recurrencia, con hora, aún no empezado y título que encaja con un patrón — lo creara quien lo creara. Todo lo demás es fijo (recurrentes como las cenas, citas sin formato `Área:`)
-- Entradas (`VAULT_INPUTS`): `Tareas.md` (solo `- [ ]`), `planificacion/*.md` con `estado: activo`, última `planificacion/revisiones/*.md`, `proyecto-propio/_punto-de-partida.md`, `job-search/_dashboard.md`, `_surehub/contexto-eventos.md`. Ignora `.stfolder`, `.stversions`, `.obsidian`, `.trash`, `*.sync-conflict-*`
-- Ventana (`plan_window(now, scope)`): `/plan` = **desde ahora** (siguiente franja de 30 min) hasta el domingo, cualquier día y hora (<2 h de semana → la siguiente); `/plan semana` (`siguiente`, `próxima`) = semana que viene entera. Tras la revisión en domingo → semana siguiente; en lunes → desde ahora. Ajustar conserva la ventana
-- Calendar obligatorio (`list_events`). Validación en código: descarta bloques fuera de ventana, en el pasado, <30 min o >12 h, mal formados o solapados con fijos con hora. Prompt prohíbe relleno (pausas, comida, "libre", recordatorios)
-- Flujo: propuesta → `✅ Aprobar` / `✏️ Ajustar` (texto o voz → run hijo, padre `superseded`) / `🗑 Descartar`. **Nada se escribe sin aprobar**
-- Aprobar: crea los nuevos (con descripción y color), conserva los idénticos (mismo título+inicio+fin), borra los movibles sustituidos (crear antes de borrar; idempotente: cada paso se persiste). Nota `_surehub/planificacion/AAAA-Wnn.md` (atómica `.syncthing.*.tmp` → `os.replace`); si ya existe, se añade `# Reajuste desde …`. `↩️ Deshacer` borra lo creado, recrea lo sustituido (color + descripción) y restaura la nota
-- Depende del token de Google Calendar (app OAuth publicada *In production* el 2026-11-16)
+- Sonnet ordena la respuesta por pregunta (estilo de la última revisión) → **nota nueva** `planificacion/revisiones/AAAA-MM-DD.md` (nunca sobrescribe: `-2`, `-3`…; escritura atómica `.syncthing.*.tmp` → `os.replace`). Fallo LLM → guarda la respuesta cruda igualmente
+- Manda el **resumen para pegar en el chat del móvil**, que planifica la semana
 
 ## Estado actual del módulo Finanzas
 - Modelos: `Category` (name, type, monthly_estimate, active) + `Expense` (category_id FK, amount, description, date, source) + `RecurringExpense` (name, amount, category_id, day, active)

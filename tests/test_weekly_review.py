@@ -8,13 +8,11 @@ from sqlmodel import Session, select
 
 import bot.handlers as h
 import bot.routine_handlers as rh
-from app.modules.routines import weekly_plan as wp
 from app.modules.routines import weekly_review as wr
 from app.modules.routines.engines import EngineResult
 from app.modules.routines.models import RoutineRun
 from app.modules.routines.registry import ROUTINES
 from app.modules.routines.service import execute, load_json
-from app.services import calendar as calendar_api
 
 TZ = ZoneInfo("Europe/Madrid")
 SUNDAY = datetime(2026, 11, 22, 18, tzinfo=TZ)
@@ -27,7 +25,7 @@ STRUCTURED = json.dumps({"body": "### Cuerpo\nPádel 3 días.\n### Vida\nRita el
 def vault(tmp_path, monkeypatch):
     (tmp_path / "Personal").mkdir()
     (tmp_path / "Personal" / "Revisión semanal.md").write_text(QUESTIONS, encoding="utf-8")
-    monkeypatch.setattr(wp.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    monkeypatch.setattr(wr.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
     return tmp_path
 
 
@@ -43,7 +41,7 @@ def test_review_asks_questions_from_the_users_note(session, vault):
 
 
 def test_review_falls_back_to_default_questions(session, tmp_path, monkeypatch):
-    monkeypatch.setattr(wp.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
+    monkeypatch.setattr(wr.settings, "OBSIDIAN_VAULT_PATH", str(tmp_path))
     run = execute(session, ROUTINES["weekly_review"], "scheduled", now=SUNDAY)
     assert "Mente/Futuro" in load_json(run.output)["questions"]
 
@@ -92,19 +90,10 @@ def test_llm_failure_still_saves_the_raw_answer(session, vault, monkeypatch):
 
 # ── Telegram flow ───────────────────────────────────────────────────────────
 
-PLAN = json.dumps({"summary": "Foco", "blocks": [
-    {"title": "App pádel: deploy", "start": "2026-11-23T09:00", "end": "2026-11-23T12:00", "theme": "formacion"}]})
-
-
 @pytest.fixture
 def world(engine, vault, monkeypatch):
     monkeypatch.setattr(rh, "engine", engine)
-    monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [])
-    monkeypatch.setattr(wp, "run_litellm", lambda *a, **k: EngineResult(text=PLAN))
     monkeypatch.setattr(wr, "run_litellm", lambda p, **k: EngineResult(text=STRUCTURED))
-    # plan right after the review runs "now" → pin the clock to Sunday evening
-    real_execute = rh.execute
-    monkeypatch.setattr(rh, "execute", lambda *a, **k: real_execute(*a, **{**k, "now": SUNDAY}))
     return {"engine": engine, "vault": vault}
 
 
@@ -149,7 +138,7 @@ async def test_scheduled_review_sends_questions_and_stores_message_id(world):
     assert load_json(run.result)["message_id"] == 777
 
 
-async def test_answer_button_then_text_saves_review_sends_summary_and_plans(world):
+async def test_answer_button_then_text_saves_review_and_sends_summary(world):
     ctx = _ctx()
     await _scheduled_review(ctx)
     review_id = _runs(world["engine"])[0].id
@@ -163,14 +152,10 @@ async def test_answer_button_then_text_saves_review_sends_summary_and_plans(worl
     await h.message(_update(text="he hecho pádel 3 días, vi a Rita"), ctx)
 
     runs = _runs(world["engine"])
-    assert [(r.routine_key, r.status, r.trigger) for r in runs] == [
-        ("weekly_review", "succeeded", "scheduled"),
-        ("weekly_plan", "awaiting_approval", "after_review"),
-    ]
-    assert load_json(runs[1].output)["week"] == "2026-W48"     # Sunday → next week
-    sent = [c.kwargs["text"] for c in ctx.bot.send_message.call_args_list]
-    assert any("Resumen para el chat de planificación" in t and "<pre>" in t for t in sent)
-    assert "App pádel: deploy" in sent[-1]
+    assert [(r.routine_key, r.status) for r in runs] == [("weekly_review", "succeeded")]
+    last = ctx.bot.send_message.call_args.kwargs["text"]
+    assert "Resumen para el chat de planificación" in last and "<pre>" in last
+    assert "Prioridad: candidaturas." in last
 
 
 async def test_reply_to_the_questions_message_answers_after_restart(world):
@@ -194,7 +179,7 @@ async def test_voice_answer(world, monkeypatch):
     assert load_json(_runs(world["engine"])[0].output)["answer"] == "revisión por voz"
 
 
-async def test_skip_launches_plan_without_review(world):
+async def test_skip_closes_the_review(world):
     ctx = _ctx()
     await _scheduled_review(ctx)
     review_id = _runs(world["engine"])[0].id
@@ -204,8 +189,7 @@ async def test_skip_launches_plan_without_review(world):
     await rh.callback_routine(cb, ctx)
 
     runs = _runs(world["engine"])
-    assert runs[0].status == "skipped"
-    assert (runs[1].routine_key, runs[1].status) == ("weekly_plan", "awaiting_approval")
+    assert [(r.routine_key, r.status) for r in runs] == [("weekly_review", "skipped")]
 
 
 async def test_unrelated_text_is_not_captured_as_review(world, monkeypatch):

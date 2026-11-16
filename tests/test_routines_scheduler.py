@@ -25,12 +25,6 @@ def test_weekly_review_registered_sunday_18_madrid():
     assert fire == datetime(2026, 11, 22, 18, tzinfo=TZ)
 
 
-def test_weekly_plan_has_no_schedule_of_its_own():
-    # launched after the review (or skip) and by /plan, never by cron
-    assert ROUTINES["weekly_plan"].trigger() is None
-    assert missed_fire(ROUTINES["weekly_plan"], datetime(2026, 11, 22, 20, tzinfo=TZ)) is None
-
-
 def test_trigger_respects_dst():
     # last Sunday of October: CEST → CET, still 19:00 local
     r = _routine()
@@ -51,32 +45,6 @@ def test_execute_failure_is_recorded_not_raised(session):
     run = execute(session, _routine(run=boom), "scheduled")
     assert run.status == "failed"
     assert "calendar down" in run.error
-
-
-def test_execute_passes_context_and_supersedes_parent(session):
-    seen = {}
-
-    def capture(s, ctx):
-        seen.update(trigger=ctx.trigger, correction=ctx.correction, parent=ctx.parent.id)
-        return Outcome(status="awaiting_approval")
-
-    parent = execute(session, _routine(lambda s, c: Outcome(status="awaiting_approval")), "manual")
-    child = execute(session, _routine(capture), "adjust", parent=parent, correction="menos pádel")
-
-    assert seen == {"trigger": "adjust", "correction": "menos pádel", "parent": parent.id}
-    assert child.parent_run_id == parent.id
-    session.refresh(parent)
-    assert parent.status == "superseded"
-
-
-def test_failed_adjust_keeps_parent_pending(session):
-    parent = execute(session, _routine(lambda s, c: Outcome(status="awaiting_approval")), "manual")
-
-    def boom(s, ctx):
-        raise ValueError("x")
-    execute(session, _routine(boom), "adjust", parent=parent, correction="c")
-    session.refresh(parent)
-    assert parent.status == "awaiting_approval"
 
 
 def test_list_runs_newest_first_and_filtered(session):
@@ -112,7 +80,7 @@ def test_needs_catch_up_only_without_run_since_fire(session):
     session.commit()
     assert needs_catch_up(session, r, now) is True
 
-    # any run after the fire (manual /plan included) does
+    # any run after the fire (manual included) does
     session.add(RoutineRun(routine_key="test", started_at=datetime(2026, 11, 22, 18, 30)))  # 19:30 local
     session.commit()
     assert needs_catch_up(session, r, now) is False

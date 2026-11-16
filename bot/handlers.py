@@ -137,7 +137,7 @@ async def voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await safe_reply(update,"El audio no tenía texto reconocible.")
         return
 
-    if await _maybe_routine_adjustment(update, context, text.strip()):
+    if await _maybe_routine_answer(update, context, text.strip()):
         return
     await _save_and_reply_note(update, text, source="telegram-voice", label="Nota guardada (voz)", icon="🎤")
 
@@ -396,9 +396,9 @@ async def callback_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_reply(update, response, parse_mode="Markdown")
 
 
-async def _maybe_routine_adjustment(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> bool:
-    """Text/voice that answers a routine (weekly review, plan correction) instead of
-    being captured as a note or expense."""
+async def _maybe_routine_answer(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> bool:
+    """Text/voice that answers the weekly review instead of being captured as a note
+    or expense: after pressing Responder, or as a reply to the questions message."""
     from bot import routine_handlers as rh
 
     review_id = context.user_data.pop(rh.REVIEW_KEY, None)
@@ -406,19 +406,15 @@ async def _maybe_routine_adjustment(update: Update, context: ContextTypes.DEFAUL
     reply_id = getattr(reply, "message_id", None) if reply is not None else None
     if review_id is None and isinstance(reply_id, int):
         review_id = await asyncio.to_thread(rh.pending_review_for_reply, reply_id)
-    if review_id is not None and await rh.apply_review_answer(update, context, review_id, text):
-        return True
-
-    run_id = context.user_data.pop(rh.ADJUST_KEY, None)
-    if run_id is None:
+    if review_id is None:
         return False
-    return await rh.apply_adjustment(update, context, run_id, text)
+    return await rh.apply_review_answer(update, context, review_id, text)
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not allowed(update):
         return
-    if await _maybe_routine_adjustment(update, context, update.message.text.strip()):
+    if await _maybe_routine_answer(update, context, update.message.text.strip()):
         return
     edit_id = context.user_data.pop("inbox_edit_id", None)
     if edit_id is not None:

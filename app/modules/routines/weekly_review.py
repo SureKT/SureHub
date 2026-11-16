@@ -1,6 +1,7 @@
 """Weekly review routine: the server asks the review questions on Sunday (Telegram),
 the user answers in one voice/text message whenever they can, and the answers are
-saved as a new note in the vault. The weekly plan is launched right after.
+saved as a new note in the vault. Planning itself happens in the user's Claude
+mobile chat: the bot sends a summary to paste there.
 
 The questions are read live from the user's own note (QUESTIONS_REL) so editing
 them in Obsidian changes the review without a deploy.
@@ -8,6 +9,7 @@ them in Obsidian changes the review without a deploy.
 import html
 import json
 import logging
+import os
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -18,9 +20,6 @@ from app.config import settings
 from app.modules.routines.engines import run_litellm
 from app.modules.routines.models import RoutineRun
 from app.modules.routines.service import Outcome, RunContext, load_json
-from app.modules.routines.weekly_plan import (
-    MONTHS_ES, REVISION_GLOB, _extract_json, _vault_files, write_note_atomic,
-)
 
 logger = logging.getLogger("surehub.routines")
 
@@ -28,6 +27,7 @@ KEY = "weekly_review"
 QUESTIONS_REL = "Personal/Revisión semanal.md"
 REVIEW_DIR = "planificacion/revisiones"
 MAX_EXAMPLE_CHARS = 4000
+MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 DEFAULT_QUESTIONS = """### 🧭 ¿Estoy viviendo en la dirección que elegí?
 
@@ -102,7 +102,7 @@ def render_questions(output: dict) -> str:
         else:
             lines.append(clean)
     lines.append("\n🎤 Responde todo de golpe con un audio o texto: pulsa <b>Responder</b> "
-                 "o contesta a este mensaje. Luego preparo el plan de la semana.")
+                 "o contesta a este mensaje.")
     return "\n".join(lines)
 
 
@@ -116,9 +116,34 @@ def _note_path(vault: Path, day: str) -> str:
     return rel
 
 
+def _is_sync_artifact(path: Path) -> bool:
+    return ".sync-conflict-" in path.name or path.name.startswith((".syncthing.", "~syncthing~"))
+
+
 def _latest_example(vault: Path) -> str:
-    files = _vault_files(vault, REVISION_GLOB)
+    files = sorted(p for p in (vault / REVIEW_DIR).glob("*.md") if not _is_sync_artifact(p))
     return files[-1].read_text(encoding="utf-8")[:MAX_EXAMPLE_CHARS] if files else "(no hay)"
+
+
+def _extract_json(text: str) -> dict:
+    m = re.search(r"\{.*\}", text, re.DOTALL)
+    if not m:
+        raise ValueError("La respuesta del modelo no contiene JSON")
+    data = json.loads(m.group(0))
+    if not isinstance(data, dict):
+        raise ValueError("JSON del modelo no es un objeto")
+    return data
+
+
+def write_note_atomic(vault: Path, relpath: str, content: str) -> Path:
+    """Temp file + os.replace in the same dir. The `.syncthing.*.tmp` name is in
+    Syncthing's built-in ignore set, so a half-written file is never synced."""
+    target = vault / relpath
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.parent / f".syncthing.{target.name}.tmp"
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, target)
+    return target
 
 
 def _note(day: str, body: str) -> str:

@@ -2,7 +2,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from apscheduler.triggers.cron import CronTrigger
@@ -17,14 +17,11 @@ logger = logging.getLogger("surehub.routines")
 class RunContext:
     now: datetime                        # tz-aware, routine timezone
     trigger: str
-    parent: Optional[RoutineRun] = None  # previous run when regenerating (adjust)
-    correction: Optional[str] = None
-    options: dict = field(default_factory=dict)   # manual-run arguments (e.g. /plan semana)
 
 
 @dataclass
 class Outcome:
-    status: str = "succeeded"            # succeeded | awaiting_approval
+    status: str = "succeeded"            # succeeded | awaiting_input
     output: dict = field(default_factory=dict)
     cost_usd: float = 0.0
 
@@ -34,16 +31,14 @@ class Routine:
     key: str
     name: str
     description: str
-    cron: Optional[str]                  # crontab, 5 fields, in `timezone`; None = only triggered
+    cron: str                            # crontab, 5 fields, in `timezone`
     timezone: str
     run: Callable[[Session, RunContext], Outcome]
     # If the bot was down at fire time (deploy, restart), run on startup as long
     # as we're within this many hours of the missed fire. 0 = no catch-up.
     catch_up_hours: int = 0
 
-    def trigger(self) -> CronTrigger | None:
-        if not self.cron:
-            return None
+    def trigger(self) -> CronTrigger:
         return CronTrigger.from_crontab(self.cron, timezone=ZoneInfo(self.timezone))
 
 
@@ -51,27 +46,21 @@ def _utc_naive(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
-def execute(session: Session, routine: Routine, trigger: str, *, now: datetime | None = None,
-            parent: RoutineRun | None = None, correction: str | None = None,
-            options: dict | None = None) -> RoutineRun:
+def execute(session: Session, routine: Routine, trigger: str, *,
+            now: datetime | None = None) -> RoutineRun:
     """Run a routine and persist the run. Never raises: failures end as status=failed
     so the caller can alert instead of losing the error in a job thread."""
     now = now or datetime.now(ZoneInfo(routine.timezone))
-    run = RoutineRun(routine_key=routine.key, trigger=trigger,
-                     parent_run_id=parent.id if parent else None)
+    run = RoutineRun(routine_key=routine.key, trigger=trigger)
     session.add(run)
     session.commit()
     session.refresh(run)
 
     try:
-        outcome = routine.run(session, RunContext(now=now, trigger=trigger, parent=parent,
-                                                  correction=correction, options=options or {}))
+        outcome = routine.run(session, RunContext(now=now, trigger=trigger))
         run.status = outcome.status
         run.output = json.dumps(outcome.output, ensure_ascii=False)
         run.cost_usd = outcome.cost_usd
-        if parent is not None:
-            parent.status = "superseded"
-            session.add(parent)
     except Exception as e:
         logger.exception("Routine %s failed", routine.key)
         run.status = "failed"
@@ -102,9 +91,9 @@ def last_run(session: Session, routine_key: str) -> RoutineRun | None:
 
 def missed_fire(routine: Routine, now: datetime) -> datetime | None:
     """Most recent fire time within the catch-up window (≤ now), or None."""
-    trigger = routine.trigger()
-    if routine.catch_up_hours <= 0 or trigger is None:
+    if routine.catch_up_hours <= 0:
         return None
+    trigger = routine.trigger()
     window_start = now - timedelta(hours=routine.catch_up_hours)
     fire = trigger.get_next_fire_time(None, window_start)
     last = None

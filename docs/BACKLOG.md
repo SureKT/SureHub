@@ -28,11 +28,11 @@ aquí solo hitos si hace falta contexto.
 
 ## Hecho
 
-- [x] **Rutinas + planificación semanal** (2026-11-16) — módulo `routines` genérico (registro en código,
-  runs en SQLite, scheduler en el bot con catch-up, LLM vía litellm) + `weekly_plan`
-  (domingo 19:00, `/plan`, aprobación Telegram → Calendar con colores + nota en `_surehub/planificacion/`).
-  Después: revisión semanal (domingo 18:00, preguntas desde el vault, nota nueva + resumen) que lanza
-  el plan; bloques compartidos con el chat de Claude del móvil vía convención visible en el vault.
+- [x] **Rutinas: revisión semanal** (2026-11-16) — módulo `routines` genérico (registro en código,
+  runs en SQLite, scheduler en el bot con catch-up) + `weekly_review` (domingo 18:00, preguntas desde el
+  vault, respuesta por voz/texto → nota nueva + resumen para el chat de Claude del móvil).
+  Se construyó y luego se quitó un planificador `weekly_plan` (→ Calendar con aprobación): duplicaba al
+  chat del móvil, que es quien planifica. En git `2b7ccda` por si acaso.
 
 - [x] **LLM Routing — Fase 2 (Ollama local)** (2026-08-25) — container `ollama` en el server
   (CPU, red `ollama-net`) + `qwen2.5:3b`. `TIERS["local_ok"]` = local → fallback Haiku, con

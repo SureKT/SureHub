@@ -13,9 +13,10 @@ class RoutineRun(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     routine_key: str = Field(index=True)
-    trigger: str = "manual"            # scheduled | manual | catch_up | adjust
-    status: str = "running"            # running | succeeded | failed | awaiting_approval |
-                                       # approving | approved | discarded | superseded | undone
+    trigger: str = "manual"            # scheduled | manual | catch_up
+    status: str = "running"            # running | succeeded | failed | awaiting_input | skipped
+    # engine / parent_run_id: unused since the weekly plan was removed (2026-11-16);
+    # kept because the prod table has them.
     engine: str = ""
     parent_run_id: Optional[int] = Field(default=None, foreign_key="routine_runs.id")
     started_at: datetime = Field(default_factory=datetime.utcnow, index=True, sa_type=DateTime)
