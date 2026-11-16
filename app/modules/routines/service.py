@@ -20,6 +20,7 @@ class RunContext:
     engine: str = "litellm"
     parent: Optional[RoutineRun] = None  # previous run when regenerating (adjust)
     correction: Optional[str] = None
+    options: dict = field(default_factory=dict)   # manual-run arguments (e.g. /plan semana)
 
 
 @dataclass
@@ -51,7 +52,8 @@ def _utc_naive(dt: datetime) -> datetime:
 
 
 def execute(session: Session, routine: Routine, trigger: str, *, now: datetime | None = None,
-            parent: RoutineRun | None = None, correction: str | None = None) -> RoutineRun:
+            parent: RoutineRun | None = None, correction: str | None = None,
+            options: dict | None = None) -> RoutineRun:
     """Run a routine and persist the run. Never raises: failures end as status=failed
     so the caller can alert instead of losing the error in a job thread."""
     now = now or datetime.now(ZoneInfo(routine.timezone))
@@ -63,7 +65,7 @@ def execute(session: Session, routine: Routine, trigger: str, *, now: datetime |
 
     try:
         outcome = routine.run(session, RunContext(now=now, trigger=trigger, engine=routine.engine, parent=parent,
-                                                  correction=correction))
+                                                  correction=correction, options=options or {}))
         run.status = outcome.status
         run.output = json.dumps(outcome.output, ensure_ascii=False)
         run.cost_usd = outcome.cost_usd

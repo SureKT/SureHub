@@ -23,7 +23,8 @@ HELP = (
     "*Inbox*\n"
     "/inbox — procesar notas pendientes (digest)\n\n"
     "*Rutinas*\n"
-    "/plan — proponer la semana en bloques (aprobar → Calendar + nota)\n"
+    "/plan — replanificar desde ahora hasta el domingo (aprobar → Calendar + nota)\n"
+    "/plan semana — planificar la semana que viene entera\n"
     "/routines — listar rutinas, últimos runs y lanzarlas\n\n"
     "/start — mensaje de bienvenida"
 )

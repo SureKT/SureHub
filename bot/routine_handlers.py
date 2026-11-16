@@ -77,15 +77,16 @@ async def _send(bot, text: str, kb=None):
 
 
 def _execute_sync(key: str, trigger: str, parent_id: int | None = None,
-                  correction: str | None = None) -> RoutineRun:
+                  correction: str | None = None, options: dict | None = None) -> RoutineRun:
     with Session(engine) as session:
         parent = get_run(session, parent_id) if parent_id else None
-        return execute(session, ROUTINES[key], trigger, parent=parent, correction=correction)
+        return execute(session, ROUTINES[key], trigger, parent=parent, correction=correction,
+                       options=options)
 
 
 async def run_and_deliver(bot, key: str, trigger: str, parent_id: int | None = None,
-                          correction: str | None = None) -> RoutineRun:
-    run = await asyncio.to_thread(_execute_sync, key, trigger, parent_id, correction)
+                          correction: str | None = None, options: dict | None = None) -> RoutineRun:
+    run = await asyncio.to_thread(_execute_sync, key, trigger, parent_id, correction, options)
     text, kb = render_run(run)
     await _send(bot, text, kb)
     return run
@@ -117,12 +118,22 @@ def schedule_routines(app: Application) -> None:
 
 # ── commands ────────────────────────────────────────────────────────────────
 
+NEXT_WEEK_ARGS = {"semana", "siguiente", "proxima", "próxima", "next"}
+
+
+def plan_scope(args: list[str]) -> str:
+    return "next" if any(a.lower() in NEXT_WEEK_ARGS for a in args) else "rest"
+
+
 async def cmd_plan(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/plan → replan from now until Sunday · /plan semana → the whole next week."""
     if not allowed(update):
         return
-    await safe_reply(update, "🗓 Generando propuesta de la semana…")
+    scope = plan_scope(context.args or [])
+    label = "la semana que viene" if scope == "next" else "desde ahora hasta el domingo"
+    await safe_reply(update, f"🗓 Generando propuesta ({label})…")
     await update.message.reply_chat_action("typing")
-    await run_and_deliver(context.bot, weekly_plan.KEY, "manual")
+    await run_and_deliver(context.bot, weekly_plan.KEY, "manual", options={"scope": scope})
 
 
 async def cmd_routines(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -7,7 +7,7 @@ import pytest
 from app.modules.routines import weekly_plan as wp
 from app.modules.routines.engines import EngineResult
 from app.modules.routines.registry import ROUTINES
-from app.modules.routines.service import execute, load_json
+from app.modules.routines.service import RunContext, execute, load_json
 from app.services import calendar as calendar_api
 
 TZ = ZoneInfo("Europe/Madrid")
@@ -29,26 +29,49 @@ def _model(blocks, summary="Semana de foco en la app"):
 
 # ── window ──────────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("now,expected", [
-    (datetime(2026, 11, 22, 19, tzinfo=TZ), (MON, SUN, "2026-W48")),          # scheduled Sunday
-    (datetime(2026, 11, 23, 8, tzinfo=TZ), (MON, SUN, "2026-W48")),           # Monday catch-up
-    (datetime(2026, 11, 25, 15, tzinfo=TZ), (date(2026, 11, 25), SUN, "2026-W48")),  # mid-week replan
-    (datetime(2026, 11, 25, 19, tzinfo=TZ), (date(2026, 11, 26), SUN, "2026-W48")),  # evening → tomorrow
-    (datetime(2026, 11, 22, 10, tzinfo=TZ), (MON, SUN, "2026-W48")),          # Sunday morning → next week
-    (datetime(2026, 12, 27, 19, tzinfo=TZ), (date(2026, 12, 28), date(2027, 1, 3), "2026-W53")),
-])
-def test_plan_window(now, expected):
-    assert wp.plan_window(now) == expected
+W48 = "2026-W48"
 
 
 @pytest.mark.parametrize("now,expected", [
-    (datetime(2026, 11, 25, 15, 10, tzinfo=TZ), datetime(2026, 11, 25, 15, 30)),
-    (datetime(2026, 11, 25, 15, 30, tzinfo=TZ), datetime(2026, 11, 25, 16, 0)),
-    (datetime(2026, 11, 22, 19, tzinfo=TZ), datetime(2026, 11, 23, 0, 0)),   # window starts tomorrow
+    # any day, any hour: from the next 30-min slot until Sunday
+    (datetime(2026, 11, 25, 15, 10, tzinfo=TZ), (date(2026, 11, 25), SUN, W48, datetime(2026, 11, 25, 15, 30))),
+    (datetime(2026, 11, 25, 22, 0, tzinfo=TZ), (date(2026, 11, 25), SUN, W48, datetime(2026, 11, 25, 22, 30))),
+    (datetime(2026, 11, 23, 8, 0, tzinfo=TZ), (MON, SUN, W48, datetime(2026, 11, 23, 8, 30))),
+    # Sunday itself can be replanned...
+    (datetime(2026, 11, 29, 10, 0, tzinfo=TZ), (SUN, SUN, W48, datetime(2026, 11, 29, 10, 30))),
+    # ...until less than 2h are left in the week → next week
+    (datetime(2026, 11, 29, 22, 15, tzinfo=TZ), (date(2026, 11, 30), date(2026, 12, 6), "2026-W49",
+                                                 datetime(2026, 11, 30, 0, 0))),
 ])
-def test_not_before(now, expected):
-    start, _, _ = wp.plan_window(now)
-    assert wp.not_before(now, start) == expected
+def test_plan_window_rest_of_week(now, expected):
+    assert wp.plan_window(now, "rest") == expected
+
+
+@pytest.mark.parametrize("now", [datetime(2026, 11, 22, 19, tzinfo=TZ), datetime(2026, 11, 18, 11, tzinfo=TZ)])
+def test_plan_window_next_week(now):
+    start, end, label, earliest = wp.plan_window(now, "next")
+    if now.weekday() == 6:
+        assert (start, end, label) == (MON, SUN, W48)
+    else:
+        assert (start, end, label) == (MON, SUN, W48)
+    assert earliest == datetime(2026, 11, 23, 0, 0)
+
+
+def test_year_boundary_week_label():
+    assert wp.plan_window(datetime(2026, 12, 27, 19, tzinfo=TZ), "next")[:3] == (
+        date(2026, 12, 28), date(2027, 1, 3), "2026-W53")
+
+
+@pytest.mark.parametrize("trigger,now,options,expected", [
+    ("scheduled", datetime(2026, 11, 22, 19, tzinfo=TZ), {}, "next"),
+    ("catch_up", datetime(2026, 11, 22, 23, tzinfo=TZ), {}, "next"),
+    ("catch_up", datetime(2026, 11, 23, 8, tzinfo=TZ), {}, "rest"),   # Monday: the week just started
+    ("manual", datetime(2026, 11, 22, 11, tzinfo=TZ), {}, "rest"),
+    ("manual", datetime(2026, 11, 25, 11, tzinfo=TZ), {"scope": "next"}, "next"),
+])
+def test_resolve_scope(trigger, now, options, expected):
+    ctx = RunContext(now=now, trigger=trigger, options=options)
+    assert wp.resolve_scope(ctx) == expected
 
 
 # ── vault inputs ────────────────────────────────────────────────────────────
@@ -233,7 +256,7 @@ def test_approve_creates_colored_tagged_events_and_note(session, fake_world, mon
 
 
 def test_approve_retry_after_partial_failure_does_not_duplicate(session, fake_world, monkeypatch):
-    run = execute(session, ROUTINES["weekly_plan"], "manual",
+    run = execute(session, ROUTINES["weekly_plan"], "scheduled",
                   now=datetime(2026, 11, 22, 19, tzinfo=TZ))
     calls = []
 
@@ -255,7 +278,7 @@ def test_approve_retry_after_partial_failure_does_not_duplicate(session, fake_wo
 
 
 def test_undo_deletes_events_and_note(session, fake_world, monkeypatch):
-    run = execute(session, ROUTINES["weekly_plan"], "manual",
+    run = execute(session, ROUTINES["weekly_plan"], "scheduled",
                   now=datetime(2026, 11, 22, 19, tzinfo=TZ))
     monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: (f"id-{a[0]}", "l"))
     wp.approve(session, run, fake_world["vault"])

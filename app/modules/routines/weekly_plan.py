@@ -98,33 +98,47 @@ Son movibles: mantenlos si siguen encajando, muévelos si algo nuevo choca, o qu
 """
 
 SLOT_MINUTES = 30
+MIN_REMAINING = timedelta(hours=2)
 
 
 # ── window ──────────────────────────────────────────────────────────────────
 
-def plan_window(now: datetime) -> tuple[date, date, str]:
-    """Days to plan. Sunday → whole next week (scheduled run, or planning ahead);
-    other days → the rest of this week, from today if there's still afternoon left
-    (replanning mid-week after moving things by hand), otherwise from tomorrow."""
-    today = now.date()
-    if today.weekday() == 6:
-        start = today + timedelta(days=1)
-    elif now.hour < 18:
-        start = today
-    else:
-        start = today + timedelta(days=1)
-    end = start + timedelta(days=6 - start.weekday())
-    year, week, _ = start.isocalendar()
-    return start, end, f"{year}-W{week:02d}"
-
-
-def not_before(now: datetime, start: date) -> datetime:
-    """Earliest time a block may start: next 30-min slot if planning from today."""
-    if start != now.date():
-        return datetime.combine(start, datetime.min.time())
+def _next_slot(now: datetime) -> datetime:
     naive = now.replace(tzinfo=None, second=0, microsecond=0)
     extra = (-naive.minute) % SLOT_MINUTES or SLOT_MINUTES
     return naive + timedelta(minutes=extra)
+
+
+def _label(start: date) -> str:
+    year, week, _ = start.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def plan_window(now: datetime, scope: str = "rest") -> tuple[date, date, str, datetime]:
+    """(start, end, week label, earliest block start).
+
+    rest: from the next 30-min slot until Sunday — replanning works any day, any
+          hour. With under MIN_REMAINING left in the week it falls through to next.
+    next: the whole next week (Monday→Sunday)."""
+    today = now.date()
+    if scope == "rest":
+        earliest = _next_slot(now)
+        end = today + timedelta(days=6 - today.weekday())
+        week_over = datetime.combine(end + timedelta(days=1), datetime.min.time())
+        if week_over - earliest >= MIN_REMAINING:
+            return today, end, _label(today), earliest
+    start = today + timedelta(days=7 - today.weekday())
+    return start, start + timedelta(days=6), _label(start), datetime.combine(start, datetime.min.time())
+
+
+def resolve_scope(ctx: RunContext) -> str:
+    """Manual runs choose (default: rest of the week). The Sunday schedule plans the
+    next week; a Monday-morning catch-up plans the week that just started."""
+    if ctx.options.get("scope") in ("rest", "next"):
+        return ctx.options["scope"]
+    if ctx.trigger in ("scheduled", "catch_up") and ctx.now.weekday() == 6:
+        return "next"
+    return "rest"
 
 
 def _fmt_day(d: date) -> str:
@@ -325,8 +339,7 @@ def run(session: Session, ctx: RunContext) -> Outcome:
         earliest = datetime.fromisoformat(previous["not_before"]) if previous.get("not_before") \
             else datetime.combine(start, datetime.min.time())
     else:
-        start, end, label = plan_window(ctx.now)
-        earliest = not_before(ctx.now, start)
+        start, end, label, earliest = plan_window(ctx.now, resolve_scope(ctx))
 
     # Calendar is mandatory: planning blind would propose blocks over real events.
     events = calendar_api.list_events(start, end)

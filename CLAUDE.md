@@ -100,7 +100,7 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 - `/gastos` — últimos 10, o `/gastos mes` (sin id, lista limpia)
 - `/gastosid` — igual que `/gastos` pero con el id de cada gasto para `/borrar` (oculto del menú, solo en `/help`)
 - `/inbox` — escaneo + digest con botones; job diario a `INBOX_DIGEST_HOUR`
-- `/plan` — rutina de planificación semanal bajo demanda (ver módulo Rutinas)
+- `/plan` — replanifica desde ahora hasta el domingo · `/plan semana` — la semana que viene (ver módulo Rutinas)
 - `/routines` — lista rutinas + últimos runs + botón ▶️ para lanzarlas
 - `/analisis` — Claude Sonnet sobre finanzas del mes; **confirmación obligatoria** (inline) antes de llamar a la API; fuera del menú por coste
 
@@ -119,7 +119,7 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 - Notas `uncertain` (o voz 🎤): botones individuales + flujo editar (siguiente mensaje de texto)
 - Eventos (`event`): Sonnet extrae fecha/duración/temática (`extract_event` en `service.py`, 2ª llamada solo en notas-evento; fallo → la nota cae a `uncertain`). Tarjeta **individual** en el digest con fecha legible; `📅 Crear` → Google Calendar (`app/services/calendar.py`) con color por temática (`CALENDAR_COLORS`), nota → `archivo/`, status `scheduled`, guarda `calendar_event_id`, responde con link. `✏️ Editar fecha` re-extrae y reenvía la tarjeta. Sin comando Telegram (se gestiona desde el digest). Duración: explícita / inicio+fin / +1h default / all-day sin hora
 - **Contexto personal de eventos fuera del repo** (el repo es público): personas, sitios y citas recurrentes → theme/summary viven en `{vault}/_surehub/contexto-eventos.md` (líneas de reglas, se inyectan tal cual en `EVENT_PROMPT` vía `load_event_context`; se lee en cada extracción, editable desde Obsidian sin desplegar). Fichero ausente → solo reglas genéricas. No volver a meter nombres propios en prompts ni comentarios del código
-- Google Calendar — **dos capas**: auth en `app/modules/calendar/` (OAuth **web flow**, token persistido en SQLite tabla `google_tokens`, refresh automático; expone `get_credentials`) + Calendar API en `app/services/calendar.py` (colores por temática, all-day; su `_service()` pide credenciales a la capa de auth). OAuth one-time: visitar `/api/calendar/oauth/init` vía túnel SSH a `localhost:8001` (Google no acepta IPs; ver redirect URI). Router `app/routers/calendar.py`: `oauth/init`, `oauth/callback`, `status`. Env: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_ID` (default `primary`). ⚠️ App Google en modo **Testing** → token expira a 7 días salvo verificación (en curso)
+- Google Calendar — **dos capas**: auth en `app/modules/calendar/` (OAuth **web flow**, token persistido en SQLite tabla `google_tokens`, refresh automático; expone `get_credentials`) + Calendar API en `app/services/calendar.py` (colores por temática, all-day; su `_service()` pide credenciales a la capa de auth). OAuth one-time: visitar `/api/calendar/oauth/init` vía túnel SSH a `localhost:8001` (Google no acepta IPs; ver redirect URI). Router `app/routers/calendar.py`: `oauth/init`, `oauth/callback`, `status`. Env: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_ID` (default `primary`). App Google publicada *In production* sin verificar (2026-11-16, privacy policy en `PRIVACY.md`); si el token volviera a caducar a 7 días, falta la verificación
 - Spec Fase 1: `docs/superpowers/specs/2026-06-18-inbox-auto-processing-design.md`
 - Spec Fase 2 (hecho 2026-06-18): `docs/superpowers/specs/2026-06-18-inbox-calendar-events-design.md`
 
@@ -133,14 +133,14 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 - API solo lectura: `GET /api/routines`, `/api/routines/runs?routine_key=`, `/api/routines/runs/{id}`
 - **`weekly_plan`** (domingo 19:00 Europe/Madrid, catch-up hasta lunes 9:00, + `/plan`):
   - Entradas (`VAULT_INPUTS`): `Tareas.md` (solo `- [ ]`), `planificacion/*.md` con `estado: activo`, última `planificacion/revisiones/*.md`, `proyecto-propio/_punto-de-partida.md`, `job-search/_dashboard.md`, `_surehub/contexto-eventos.md`. Ignora `.stfolder`, `.stversions`, `.obsidian`, `.trash`, `*.sync-conflict-*`
-  - Ventana: domingo → semana siguiente entera; lun–sáb antes de las 18:00 → desde ahora (siguiente franja de 30 min); después → desde mañana; siempre hasta el domingo. Ajustar conserva la ventana del run original
+  - Ventana (`plan_window(now, scope)`): `/plan` = **desde ahora** (siguiente franja de 30 min) hasta el domingo, cualquier día y hora (si quedan <2 h de semana → la siguiente); `/plan semana` (`siguiente`, `próxima`) = semana que viene entera. Programado del domingo → semana siguiente; catch-up del lunes → desde ahora. Ajustar conserva la ventana del run original
   - Calendar es obligatorio (`list_events`): sin él falla en vez de planificar a ciegas. Validación en código: descarta bloques fuera de la semana, >12 h, mal formados o solapados con eventos con hora (los all-day no bloquean). Temas = claves de `CALENDAR_COLORS`
   - Los recurrentes y demás eventos de Calendar son fijos; los **bloques de trabajo** (proyecto/dinero/aprender) los propone Claude cada semana siguiendo el día tipo del plan activo y encajándolos alrededor de los eventos
   - **Replanificar a mitad de semana** (`/plan` tras mover cosas a mano): `split_events` separa fijos (no-SureHub, o de SureHub que el usuario movió: hora ≠ la creada) de **movibles** (de SureHub, sin tocar, aún no empezados). Los movibles van al prompt como "plan vigente"; al aprobar se crean los nuevos, se conservan los idénticos y se borran los sustituidos (crear antes de borrar). La nota de la semana recibe una sección `# Reajuste desde …`. Deshacer borra lo creado, recrea lo sustituido (mismo color) y restaura la nota
   - Flujo: propuesta → `✅ Aprobar` / `✏️ Ajustar` (texto o voz → run hijo, el padre queda `superseded`) / `🗑 Descartar`. **Nada se escribe sin aprobar**
   - Aprobar: crea eventos con `extendedProperties.private.surehub_run` (idempotente: cada id se guarda al crearse, reintentar no duplica) + nota `_surehub/planificacion/AAAA-Wnn.md` (escritura atómica `.syncthing.*.tmp` → `os.replace`). `↩️ Deshacer semana` borra eventos y nota
   - Aviso en la propuesta si no hay revisión semanal de los últimos días
-- ⚠️ Depende del token de Google Calendar: con la app OAuth en modo Testing caduca a 7 días y el run del domingo fallará (llega el aviso ⚠️)
+- Depende del token de Google Calendar (app OAuth publicada *In production* el 2026-11-16; si vuelve a caducar, el run falla con aviso ⚠️)
 
 ## Estado actual del módulo Finanzas
 - Modelos: `Category` (name, type, monthly_estimate, active) + `Expense` (category_id FK, amount, description, date, source) + `RecurringExpense` (name, amount, category_id, day, active)

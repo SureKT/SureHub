@@ -17,7 +17,7 @@ ALLOWED_USER_ID = 111
 
 # /plan uses the real clock: put the block on the window's last day (Sunday) late
 # enough to never be "in the past" whatever time the suite runs.
-_DAY = wp.plan_window(datetime.now(ZoneInfo("Europe/Madrid")))[1].isoformat()
+_DAY = wp.plan_window(datetime.now(ZoneInfo("Europe/Madrid")), "next")[1].isoformat()
 PROPOSAL = json.dumps({"summary": "Foco", "blocks": [
     {"title": "App pádel", "start": f"{_DAY}T20:00", "end": f"{_DAY}T21:30", "theme": "formacion"},
 ]})
@@ -73,8 +73,16 @@ def _runs(engine):
 
 async def _plan(ctx=None):
     ctx = ctx or make_context()
+    ctx.args = ["semana"]   # next week: the fixed proposal date is always inside it
     await rh.cmd_plan(make_update(), ctx)
     return ctx
+
+
+@pytest.mark.parametrize("args,expected", [
+    ([], "rest"), (["semana"], "next"), (["Próxima"], "next"), (["siguiente"], "next"), (["hoy"], "rest"),
+])
+def test_plan_scope_args(args, expected):
+    assert rh.plan_scope(args) == expected
 
 
 async def test_cmd_plan_sends_proposal_with_approval_buttons(world):
@@ -106,7 +114,8 @@ async def test_failed_run_sends_alert(world, monkeypatch):
     assert ctx.bot.send_message.call_args.kwargs["reply_markup"] is None
 
 
-async def test_scheduled_job_runs_and_delivers(world):
+async def test_scheduled_job_runs_and_delivers(world, monkeypatch):
+    monkeypatch.setattr(wp, "resolve_scope", lambda ctx: "next")   # real clock may not be Sunday
     ctx = make_context()
     ctx.job.data = {"key": "weekly_plan", "trigger": "scheduled"}
     await rh.routine_job(ctx)
