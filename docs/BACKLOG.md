@@ -21,7 +21,7 @@ aquí solo hitos si hace falta contexto.
 
 ## Pendiente — mejoras
 
-- [ ] **Rutinas** — revisión semanal guiada por Telegram (4 preguntas, respuesta por voz) que alimente `weekly_plan`; pantalla de runs en frontend; activar motor `claude_code` en prod si una rutina lo necesita
+- [ ] **Rutinas** — pantalla de runs en frontend; activar motor `claude_code` en prod si una rutina lo necesita
 
 - [ ] **Finanzas** — gráficos más ricos (evolución por categoría, comparativa meses)
 - [ ] **App shell** — login + gestión de credenciales/API keys de servicios externos
@@ -32,7 +32,8 @@ aquí solo hitos si hace falta contexto.
 - [x] **Rutinas + planificación semanal** (2026-11-16) — módulo `routines` genérico (registro en código,
   runs en SQLite, scheduler en el bot con catch-up, motores litellm/claude_code) + `weekly_plan`
   (domingo 19:00, `/plan`, aprobación Telegram → Calendar con colores + nota en `_surehub/planificacion/`).
-  Pendiente fuera de código: app OAuth de Google a *In production* (token Testing = 7 días).
+  Después: revisión semanal (domingo 18:00, preguntas desde el vault, nota nueva + resumen) que lanza
+  el plan; bloques compartidos con el chat de Claude del móvil vía convención visible en el vault.
 
 - [x] **LLM Routing — Fase 2 (Ollama local)** (2026-08-25) — container `ollama` en el server
   (CPU, red `ollama-net`) + `qwen2.5:3b`. `TIERS["local_ok"]` = local → fallback Haiku, con

@@ -10,14 +10,17 @@ CALENDAR_COLORS = {
     "social":    "5",   # Banana   — ocio con amigos
     "gimnasio":  "9",   # Blueberry — entreno rutinario
     "padel":     "10",  # Basil    — pádel / deporte de club
+    "salud":     "11",  # Tomato   — médico, vacunas
     "default":   "8",   # Graphite — sin categorizar
 }
 
 
 def _event_body(summary: str, start: str, end: str, all_day: bool, theme: str,
-                private: dict | None = None) -> dict:
+                private: dict | None = None, description: str = "") -> dict:
     color = CALENDAR_COLORS.get(theme, CALENDAR_COLORS["default"])
     body = {"summary": summary, "colorId": color}
+    if description:
+        body["description"] = description
     if private:
         # extendedProperties.private: invisible en la UI, permite reconocer y
         # deshacer en lote los eventos que creó SureHub.
@@ -46,9 +49,9 @@ def _service():
 
 
 def create_event(summary: str, start: str, end: str, all_day: bool, theme: str,
-                 private: dict | None = None) -> tuple[str, str]:
+                 private: dict | None = None, description: str = "") -> tuple[str, str]:
     """Crea el evento en Google Calendar. Devuelve (event_id, html_link)."""
-    body = _event_body(summary, start, end, all_day, theme, private)
+    body = _event_body(summary, start, end, all_day, theme, private, description)
     ev = _service().events().insert(
         calendarId=settings.GOOGLE_CALENDAR_ID, body=body
     ).execute()
@@ -84,6 +87,8 @@ def _parse_event(raw: dict) -> dict:
         "end": e,
         "all_day": all_day,
         "color_id": raw.get("colorId"),
+        "description": raw.get("description", ""),
+        "recurring": bool(raw.get("recurringEventId")),
         "surehub_run": private.get("surehub_run"),
     }
 

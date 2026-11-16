@@ -397,11 +397,22 @@ async def callback_analisis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def _maybe_routine_adjustment(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> bool:
-    run_id = context.user_data.pop("routine_adjust_run_id", None)
+    """Text/voice that answers a routine (weekly review, plan correction) instead of
+    being captured as a note or expense."""
+    from bot import routine_handlers as rh
+
+    review_id = context.user_data.pop(rh.REVIEW_KEY, None)
+    reply = getattr(update.message, "reply_to_message", None)
+    reply_id = getattr(reply, "message_id", None) if reply is not None else None
+    if review_id is None and isinstance(reply_id, int):
+        review_id = await asyncio.to_thread(rh.pending_review_for_reply, reply_id)
+    if review_id is not None and await rh.apply_review_answer(update, context, review_id, text):
+        return True
+
+    run_id = context.user_data.pop(rh.ADJUST_KEY, None)
     if run_id is None:
         return False
-    from bot.routine_handlers import apply_adjustment
-    return await apply_adjustment(update, context, run_id, text)
+    return await rh.apply_adjustment(update, context, run_id, text)
 
 
 async def message(update: Update, context: ContextTypes.DEFAULT_TYPE):

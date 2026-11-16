@@ -19,11 +19,16 @@ def _routine(run=None, cron="0 19 * * sun", catch_up_hours=14):
                    catch_up_hours=catch_up_hours)
 
 
-def test_weekly_plan_registered_sunday_19_madrid():
-    r = ROUTINES["weekly_plan"]
+def test_weekly_review_registered_sunday_18_madrid():
+    r = ROUTINES["weekly_review"]
     fire = r.trigger().get_next_fire_time(None, datetime(2026, 11, 16, 10, tzinfo=TZ))
-    assert fire == datetime(2026, 11, 22, 19, tzinfo=TZ)
-    assert fire.weekday() == 6
+    assert fire == datetime(2026, 11, 22, 18, tzinfo=TZ)
+
+
+def test_weekly_plan_has_no_schedule_of_its_own():
+    # launched after the review (or skip) and by /plan, never by cron
+    assert ROUTINES["weekly_plan"].trigger() is None
+    assert missed_fire(ROUTINES["weekly_plan"], datetime(2026, 11, 22, 20, tzinfo=TZ)) is None
 
 
 def test_trigger_respects_dst():
@@ -125,11 +130,10 @@ def test_schedule_routines_registers_cron_and_catch_up(monkeypatch, engine):
 
     rh.schedule_routines(app)
 
-    kwargs = app.job_queue.run_custom.call_args.kwargs
-    assert kwargs["data"] == {"key": "weekly_plan", "trigger": "scheduled"}
-    assert kwargs["job_kwargs"]["trigger"] is not None
-    once = app.job_queue.run_once.call_args.kwargs
-    assert once["data"] == {"key": "weekly_plan", "trigger": "catch_up"}
+    scheduled = [c.kwargs["data"] for c in app.job_queue.run_custom.call_args_list]
+    assert scheduled == [{"key": "weekly_review", "trigger": "scheduled"}]
+    caught = [c.kwargs["data"]["key"] for c in app.job_queue.run_once.call_args_list]
+    assert "weekly_review" in caught
 
 
 def test_schedule_routines_no_catch_up_when_not_needed(monkeypatch, engine):

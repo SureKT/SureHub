@@ -161,12 +161,13 @@ def test_parse_proposal_without_json_raises():
 
 
 def test_build_prompt_includes_events_inputs_themes_and_correction():
-    events = [PADEL, {**BDAY, "surehub_run": "3"}]
+    events = [PADEL, {**BDAY, "recurring": True}]
     prompt = wp.build_prompt(MON, SUN, "2026-W48", [("Tareas", "Tareas.md", "- [ ] DNI")], events,
                              previous={"summary": "s", "blocks": [{"title": "X"}]},
                              correction="mueve el gimnasio al jueves")
     assert "2026-11-23T20:30 → 22:00: Pádel" in prompt
-    assert "[creado por SureHub]" in prompt
+    assert "(recurrente)" in prompt
+    assert "Área: tarea concreta" in prompt   # shared conventions injected
     assert "- [ ] DNI" in prompt
     assert "padel:" in prompt and "default:" in prompt
     assert "Plan vigente" not in prompt   # no movable blocks → no section
@@ -313,93 +314,108 @@ def test_render_proposal_escapes_and_groups_by_day():
     assert "1 descartados" in text and "⚠️ Sin revisión" in text
 
 
-# ── mid-week replanning ─────────────────────────────────────────────────────
+# ── shared conventions + mid-week replanning ───────────────────────────────
 
-def _approved_sunday_plan(session, fake_world, monkeypatch):
-    """Sunday run approved: creates ev1 (Mon 9-12) and ev2 (Tue 8-9)."""
-    run = execute(session, ROUTINES["weekly_plan"], "scheduled",
-                  now=datetime(2026, 11, 22, 19, tzinfo=TZ))
-    ids = iter(["ev1", "ev2"])
-    monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: (next(ids), "l"))
-    wp.approve(session, run, fake_world["vault"])
-    return run
+PATTERNS = ["*: *", "Gym*"]
 
 
-def _cal_event(id_, summary, start, end, run_id=None, color="4"):
+def _cal_event(id_, summary, start, end, color="4", recurring=False, description=""):
     return {"id": id_, "summary": summary, "start": start, "end": end, "all_day": False,
-            "color_id": color, "surehub_run": str(run_id) if run_id else None}
+            "color_id": color, "surehub_run": None, "recurring": recurring, "description": description}
 
 
-def test_split_events_fixed_vs_movable(session, fake_world, monkeypatch):
-    sunday = _approved_sunday_plan(session, fake_world, monkeypatch)
+def test_conventions_note_created_once_and_patterns_parsed(tmp_path):
+    path = wp.ensure_conventions(tmp_path)
+    text, patterns = wp.load_conventions(tmp_path)
+    assert patterns == PATTERNS
+    assert "Área: tarea concreta" in text
+
+    # the user owns it after creation: edits are kept and drive the rules
+    path.write_text(text.replace("- `Gym*`", "- `Gym*`\n- `Escalada*`"), encoding="utf-8")
+    wp.ensure_conventions(tmp_path)
+    assert wp.load_conventions(tmp_path)[1] == ["*: *", "Gym*", "Escalada*"]
+
+
+def test_split_events_by_shared_convention():
     events = [
-        PADEL,                                                                     # not SureHub
-        _cal_event("ev1", "App pádel", "2026-11-23T10:00:00", "2026-11-23T13:00:00", sunday.id),  # moved by hand
-        _cal_event("ev2", "Gimnasio", "2026-11-24T08:00:00", "2026-11-24T09:00:00", sunday.id),   # untouched
-        _cal_event("ev9", "Huérfano", "2026-11-24T10:00:00", "2026-11-24T11:00:00", 999),        # unknown run
+        _cal_event("a", "App pádel: front", "2026-11-25T16:00:00", "2026-11-25T18:00:00"),   # chat-made block
+        _cal_event("b", "Gym 2 (Pierna)", "2026-11-26T08:00:00", "2026-11-26T09:00:00", "9"),
+        _cal_event("c", "Médico", "2026-11-26T10:00:00", "2026-11-26T11:00:00", "11"),
+        _cal_event("d", "Cena: Rita", "2026-11-26T21:00:00", "2026-11-26T22:00:00", recurring=True),
+        _cal_event("e", "Dinero: candidaturas", "2026-11-25T09:00:00", "2026-11-25T10:00:00", "8"),  # past
+        {**BDAY, "recurring": False},
     ]
-    fixed, movable = wp.split_events(session, events, datetime(2026, 11, 23, 0, 0))
-    assert [e["id"] for e in movable] == ["ev2"]
-    assert {e["id"] for e in fixed} == {"e1", "ev1", "ev9"}
-
-    # once its time has passed an untouched block is no longer movable
-    _, movable = wp.split_events(session, events, datetime(2026, 11, 24, 12, 0))
-    assert movable == []
+    fixed, movable = wp.split_events(events, datetime(2026, 11, 25, 15, 30), PATTERNS)
+    assert [e["id"] for e in movable] == ["a", "b"]
+    assert {e["id"] for e in fixed} == {"c", "d", "e", "e2"}
 
 
-def test_replan_midweek_replaces_untouched_blocks_and_appends_note(session, fake_world, monkeypatch):
-    sunday = _approved_sunday_plan(session, fake_world, monkeypatch)
-    # Wednesday: Sunday's Thu block is still untouched, a new fixed event appeared
-    thu = _cal_event("ev3", "Proyecto jueves", "2026-11-26T09:00:00", "2026-11-26T12:00:00", sunday.id)
-    keep = _cal_event("ev4", "Candidaturas", "2026-11-27T12:00:00", "2026-11-27T13:00:00", sunday.id, "8")
-    dentist = _cal_event("x1", "Dentista", "2026-11-26T09:30:00", "2026-11-26T10:30:00")
-    sunday.output = json.dumps({**load_json(sunday.output), "blocks": load_json(sunday.output)["blocks"] + [
-        {"title": "Proyecto jueves", "start": "2026-11-26T09:00:00", "end": "2026-11-26T12:00:00", "theme": "formacion"},
-        {"title": "Candidaturas", "start": "2026-11-27T12:00:00", "end": "2026-11-27T13:00:00", "theme": "default"},
-    ]})
-    sunday.result = json.dumps({**load_json(sunday.result),
-                                "created": {**load_json(sunday.result)["created"], "2": "ev3", "3": "ev4"}})
-    session.add(sunday); session.commit()
+def test_replan_midweek_moves_chat_blocks_and_keeps_identical(session, fake_world, monkeypatch):
+    # Wednesday: blocks created by the Claude chat (no SureHub metadata) + a new appointment
+    thu = _cal_event("ev3", "App pádel: equilibrar parejas", "2026-11-26T09:00:00", "2026-11-26T12:00:00",
+                     description="Algoritmo por nivel")
+    keep = _cal_event("ev4", "Dinero: 3 candidaturas", "2026-11-27T12:00:00", "2026-11-27T13:00:00", "8")
+    dentist = _cal_event("x1", "Dentista", "2026-11-26T09:30:00", "2026-11-26T10:30:00", "11")
     monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [thu, keep, dentist])
-    monkeypatch.setattr(wp, "run_engine", lambda *a, **k: EngineResult(text=_model([
-        _block("Proyecto jueves", "2026-11-26T10:30", "2026-11-26T13:00"),     # moved around the dentist
-        _block("Candidaturas", "2026-11-27T12:00", "2026-11-27T13:00", "default"),  # unchanged
-    ])))
+    monkeypatch.setattr(wp, "run_engine", lambda *a, **k: EngineResult(text=json.dumps({"summary": "s", "blocks": [
+        {"title": "App pádel: equilibrar parejas", "start": "2026-11-26T10:30", "end": "2026-11-26T13:00",
+         "theme": "formacion", "description": "Algoritmo por nivel"},
+        {"title": "Dinero: 3 candidaturas", "start": "2026-11-27T12:00", "end": "2026-11-27T13:00", "theme": "default"},
+    ]})))
 
     run = execute(session, ROUTINES["weekly_plan"], "manual", now=datetime(2026, 11, 25, 15, 10, tzinfo=TZ))
     out = load_json(run.output)
     assert out["start"] == "2026-11-25" and out["not_before"] == "2026-11-25T15:30"
     assert {e["id"] for e in out["replaces"]} == {"ev3", "ev4"}
     assert out["events_considered"] == 1                     # only the dentist is fixed
-    assert "♻️" in wp.render_proposal(out) and "1 bloques se mantienen" in wp.render_proposal(out)
+    assert "1 bloques se mantienen" in wp.render_proposal(out)
+    assert (fake_world["vault"] / wp.CONVENTIONS_REL).exists()
 
     created, deleted = [], []
-    monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: created.append(a[0]) or ("ev5", "l"))
+    monkeypatch.setattr(calendar_api, "create_event",
+                        lambda *a, **k: created.append((a, k.get("description"))) or ("ev5", "l"))
     monkeypatch.setattr(calendar_api, "delete_event", deleted.append)
     result = wp.approve(session, run, fake_world["vault"])
 
-    assert created == ["Proyecto jueves"]                    # unchanged one is kept, not recreated
+    assert [(a[0], d) for a, d in created] == [("App pádel: equilibrar parejas", "Algoritmo por nivel")]
     assert deleted == ["ev3"]
     assert result["kept"] == {"1": "ev4"}
-    note = (fake_world["vault"] / "_surehub/planificacion/2026-W48.md").read_text(encoding="utf-8")
-    assert note.startswith("---\ntipo: plan-semanal")      # original note preserved
-    assert "# Reajuste desde Mié 25 nov 15:30" in note
 
-    # undo: delete new, recreate replaced (same color), restore note
+    # undo: delete new, recreate the replaced one with its color and description
     recreated = []
-    monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: recreated.append(a) or ("ev6", "l"))
+    monkeypatch.setattr(calendar_api, "create_event",
+                        lambda *a, **k: recreated.append((a, k.get("description"))) or ("ev6", "l"))
     deleted.clear()
     assert wp.undo(session, run, fake_world["vault"]) == 1
     assert deleted == ["ev5"]
-    assert recreated == [("Proyecto jueves", "2026-11-26T09:00:00", "2026-11-26T12:00:00", False, "formacion")]
-    restored = (fake_world["vault"] / "_surehub/planificacion/2026-W48.md").read_text(encoding="utf-8")
-    assert "Reajuste" not in restored
+    assert recreated == [(("App pádel: equilibrar parejas", "2026-11-26T09:00:00", "2026-11-26T12:00:00",
+                           False, "formacion"), "Algoritmo por nivel")]
+
+
+def test_replan_appends_section_to_existing_week_note(session, fake_world, monkeypatch):
+    week_note = fake_world["vault"] / "_surehub/planificacion/2026-W48.md"
+    wp.write_note_atomic(fake_world["vault"], "_surehub/planificacion/2026-W48.md", "---\ntipo: plan-semanal\n---\nplan original")
+    block = _cal_event("ev3", "App pádel: x", "2026-11-26T09:00:00", "2026-11-26T12:00:00")
+    monkeypatch.setattr(calendar_api, "list_events", lambda s, e: [block])
+    monkeypatch.setattr(wp, "run_engine", lambda *a, **k: EngineResult(text=_model([
+        _block("App pádel: x", "2026-11-26T16:00", "2026-11-26T18:00")])))
+    run = execute(session, ROUTINES["weekly_plan"], "manual", now=datetime(2026, 11, 25, 15, 10, tzinfo=TZ))
+    monkeypatch.setattr(calendar_api, "create_event", lambda *a, **k: ("n1", "l"))
+    monkeypatch.setattr(calendar_api, "delete_event", lambda i: None)
+
+    wp.approve(session, run, fake_world["vault"])
+    text = week_note.read_text(encoding="utf-8")
+    assert text.startswith("---\ntipo: plan-semanal\n---\nplan original")
+    assert "# Reajuste desde Mié 25 nov 15:30" in text
+
+    wp.undo(session, run, fake_world["vault"])
+    assert week_note.read_text(encoding="utf-8") == "---\ntipo: plan-semanal\n---\nplan original"
 
 
 def test_replan_prompt_lists_current_plan_as_movable():
-    movable = [_cal_event("ev2", "Gimnasio", "2026-11-26T08:00:00", "2026-11-26T09:00:00", 1)]
+    movable = [_cal_event("ev2", "Gym 2 (Pierna)", "2026-11-26T08:00:00", "2026-11-26T09:00:00", "9")]
     prompt = wp.build_prompt(date(2026, 11, 25), SUN, "2026-W48", [], [PADEL], movable=movable,
                              earliest=datetime(2026, 11, 25, 15, 30))
     assert "el resto de la semana 2026-W48" in prompt
-    assert "Plan vigente" in prompt and "2026-11-26T08:00 → 09:00: Gimnasio" in prompt
+    assert "Plan vigente" in prompt and "2026-11-26T08:00 → 09:00: Gym 2 (Pierna)" in prompt
     assert "15:30 del 25/11" in prompt

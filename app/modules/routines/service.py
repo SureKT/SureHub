@@ -35,7 +35,7 @@ class Routine:
     key: str
     name: str
     description: str
-    cron: str                            # crontab, 5 fields, in `timezone`
+    cron: Optional[str]                  # crontab, 5 fields, in `timezone`; None = only triggered
     timezone: str
     engine: str                          # litellm | claude_code
     run: Callable[[Session, RunContext], Outcome]
@@ -43,7 +43,9 @@ class Routine:
     # as we're within this many hours of the missed fire. 0 = no catch-up.
     catch_up_hours: int = 0
 
-    def trigger(self) -> CronTrigger:
+    def trigger(self) -> CronTrigger | None:
+        if not self.cron:
+            return None
         return CronTrigger.from_crontab(self.cron, timezone=ZoneInfo(self.timezone))
 
 
@@ -102,9 +104,9 @@ def last_run(session: Session, routine_key: str) -> RoutineRun | None:
 
 def missed_fire(routine: Routine, now: datetime) -> datetime | None:
     """Most recent fire time within the catch-up window (≤ now), or None."""
-    if routine.catch_up_hours <= 0:
-        return None
     trigger = routine.trigger()
+    if routine.catch_up_hours <= 0 or trigger is None:
+        return None
     window_start = now - timedelta(hours=routine.catch_up_hours)
     fire = trigger.get_next_fire_time(None, window_start)
     last = None

@@ -2,8 +2,13 @@
 Calendar events + summary note in the vault.
 
 Nothing is written to Calendar or the vault until approve(). Vault access is
-read-only except for our own folder (NOTE_DIR), written atomically.
+read-only except for our own folder (_surehub/), written atomically.
+
+Plan blocks are recognised by a visible convention shared with the Claude mobile
+chat (CONVENTIONS_REL in the vault), not by hidden metadata: both planners can
+move, edit or delete each other's blocks on equal terms.
 """
+import fnmatch
 import html
 import json
 import os
@@ -11,7 +16,7 @@ import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.config import settings
 from app.modules.routines.engines import run_engine
@@ -36,20 +41,56 @@ VAULT_INPUTS = [
     ("Patrones de eventos", "_surehub/contexto-eventos.md", "full"),
 ]
 REVISION_GLOB = "planificacion/revisiones/*.md"
+CONVENTIONS_REL = "_surehub/convenciones-calendario.md"
+
+DEFAULT_CONVENTIONS = """---
+tipo: convencion
+---
+
+# Convenciones del calendario
+
+Las usan por igual SureHub (rutina de planificación) y el chat de Claude del móvil.
+Editar aquí vale para los dos.
+
+## Bloques de plan
+- Título: `Área: tarea concreta`. Ej.: `App pádel: emparejamientos rotativos + tests`,
+  `Dinero: 3 candidaturas`, `Aprender: WebSockets en FastAPI`.
+- Descripción: 1-3 líneas con el detalle concreto (qué hacer, criterio de hecho).
+- Sin recurrencia. Mínimo 30 minutos.
+- Las citas y compromisos reales NO usan el formato `Área:` (ej. `Médico`,
+  `Reunión cliente instituto (chatbot)`), así nadie los mueve.
+
+## Colores (colorId de Google Calendar)
+- 3 Grape: coach / terapia
+- 4 Flamingo: proyectos, formación, aprender
+- 5 Banana: social y ocio
+- 8 Graphite: dinero, búsqueda de empleo, revisión, por defecto
+- 9 Blueberry: gimnasio
+- 10 Basil: pádel, escalada, deporte de club
+- 11 Tomato: salud
+
+## Movibles
+Eventos sin recurrencia cuyo título encaja con alguno de estos patrones (`*` = cualquier
+texto, sin distinguir mayúsculas). Al replanificar se pueden mover, editar o borrar;
+todo lo demás (recurrentes incluidos) es fijo.
+- `*: *`
+- `Gym*`
+"""
 
 # Syncthing internals and conflict copies must never be read as content.
 _IGNORED_DIRS = {".stfolder", ".stversions", ".obsidian", ".trash"}
 
 THEMES = {
-    "coach": "sesiones de coach o terapia",
-    "formacion": "formación, clases y proyectos (incluido programar)",
-    "social": "planes sociales y ocio",
-    "padel": "pádel y deporte de club",
-    "gimnasio": "gimnasio, entrenamiento y escalada",
-    "default": "todo lo demás, incluida la búsqueda de empleo",
+    "coach": "coach o terapia (Grape)",
+    "formacion": "proyectos, formación, aprender (Flamingo)",
+    "social": "social y ocio (Banana)",
+    "padel": "pádel, escalada, deporte de club (Basil)",
+    "gimnasio": "gimnasio (Blueberry)",
+    "salud": "salud (Tomato)",
+    "default": "dinero, búsqueda de empleo, revisión, por defecto (Graphite)",
 }
-THEME_ICONS = {"coach": "🟣", "formacion": "🔴", "social": "🟡", "padel": "🟢",
-               "gimnasio": "🔵", "default": "⚫"}
+THEME_ICONS = {"coach": "🟣", "formacion": "🩷", "social": "🟡", "padel": "🟢",
+               "gimnasio": "🔵", "salud": "🔴", "default": "⚫"}
 DAYS_ES = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 DAYS_ES_LONG = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
 MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
@@ -65,15 +106,19 @@ PROMPT = """Planifica {span}: del {start} ({start_day}) al {end} ({end_day}). Zo
 - Los eventos fijos (incluidos los recurrentes) no se mueven: no los solapes ni los dupliques.
 - Los bloques de trabajo de cada día (proyecto, dinero/candidaturas, aprender) los propones tú siguiendo el día tipo del plan activo, pero encajados alrededor de los eventos fijos: si un evento ocupa la franja habitual, mueve o acorta el bloque en vez de perderlo.
 - Bloques concretos y accionables: qué proyecto o tarea en cada hueco, según tareas pendientes y prioridades de las notas.
+- Sigue al pie de la letra las convenciones del calendario (formato de título, descripción, colores).
 - Respeta las prioridades del plan activo y de la última revisión semanal si existen.
 - Deja huecos libres: no rellenes cada minuto. NUNCA crees bloques de pausa, comida, descanso, "libre" ni recordatorios: un hueco sin plan se queda vacío. Si la semana ya está bien cubierta, propón pocos bloques.
 - Cada bloque dura al menos 30 minutos.
 - Títulos cortos en español (máx. 60 caracteres).
-- theme debe ser una de estas claves:
+- theme decide el color; debe ser una de estas claves:
 {themes}
 
+## Convenciones del calendario
+{conventions}
+
 ## Formato de respuesta (JSON)
-{{"summary": "2-4 frases: foco de la semana y por qué", "blocks": [{{"title": "...", "start": "YYYY-MM-DDTHH:MM", "end": "YYYY-MM-DDTHH:MM", "theme": "...", "notes": "opcional, una línea"}}]}}
+{{"summary": "2-4 frases: foco de la semana y por qué", "blocks": [{{"title": "Área: tarea", "start": "YYYY-MM-DDTHH:MM", "end": "YYYY-MM-DDTHH:MM", "theme": "...", "description": "1-3 líneas de detalle"}}]}}
 
 ## Eventos fijos en el calendario
 {events}
@@ -93,9 +138,10 @@ Aplica la corrección cambiando solo lo necesario; conserva el resto de bloques 
 """
 
 CURRENT_PLAN = """
-## Plan vigente (bloques que creó SureHub y siguen sin tocar)
-Son movibles: mantenlos si siguen encajando, muévelos si algo nuevo choca, o quítalos.
-`blocks` debe contener TODO lo que quieras que quede, incluidos los que mantengas igual.
+## Plan vigente (bloques movibles ya en el calendario, de SureHub o del chat)
+Mantenlos si siguen encajando, muévelos si algo choca, o quítalos.
+`blocks` debe contener TODO lo que quieras que quede: un bloque que mantengas igual
+va con el mismo título, inicio y fin exactos (así no se recrea).
 {blocks}
 """
 
@@ -134,11 +180,11 @@ def plan_window(now: datetime, scope: str = "rest") -> tuple[date, date, str, da
 
 
 def resolve_scope(ctx: RunContext) -> str:
-    """Manual runs choose (default: rest of the week). The Sunday schedule plans the
-    next week; a Monday-morning catch-up plans the week that just started."""
+    """Manual runs choose (default: rest of the week). Automatic runs on Sunday (after
+    the review) plan the next week; on Monday morning, the week that just started."""
     if ctx.options.get("scope") in ("rest", "next"):
         return ctx.options["scope"]
-    if ctx.trigger in ("scheduled", "catch_up") and ctx.now.weekday() == 6:
+    if ctx.trigger in ("scheduled", "catch_up", "after_review") and ctx.now.weekday() == 6:
         return "next"
     return "rest"
 
@@ -203,6 +249,34 @@ def revision_is_fresh(vault: Path, start: date) -> bool:
     return False
 
 
+def ensure_conventions(vault: Path) -> Path:
+    """Create the shared conventions note once (our own folder). Never overwritten:
+    after the first write it belongs to the user, edited from Obsidian."""
+    path = vault / CONVENTIONS_REL
+    if not path.exists():
+        write_note_atomic(vault, CONVENTIONS_REL, DEFAULT_CONVENTIONS)
+    return path
+
+
+def load_conventions(vault: Path) -> tuple[str, list[str]]:
+    """(note text, movable title patterns from its `## Movibles` section)."""
+    path = vault / CONVENTIONS_REL
+    text = path.read_text(encoding="utf-8") if path.exists() else DEFAULT_CONVENTIONS
+    patterns, in_section = [], False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            in_section = line[3:].strip().lower() == "movibles"
+            continue
+        m = re.match(r"^\s*-\s*`([^`]+)`", line)
+        if in_section and m:
+            patterns.append(m.group(1))
+    return text, patterns
+
+
+def is_movable_title(title: str, patterns: list[str]) -> bool:
+    return any(fnmatch.fnmatch(title.lower(), p.lower()) for p in patterns)
+
+
 # ── prompt / parsing ────────────────────────────────────────────────────────
 
 def _fmt_events(events: list[dict]) -> str:
@@ -210,7 +284,7 @@ def _fmt_events(events: list[dict]) -> str:
         return "(ninguno)"
     lines = []
     for ev in events:
-        tag = " [creado por SureHub]" if ev.get("surehub_run") else ""
+        tag = " (recurrente)" if ev.get("recurring") else ""
         if ev["all_day"]:
             lines.append(f"- {ev['start']} (todo el día): {ev['summary']}{tag}")
         else:
@@ -218,41 +292,33 @@ def _fmt_events(events: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def split_events(session: Session, events: list[dict], earliest: datetime) -> tuple[list[dict], list[dict]]:
-    """(fixed, movable). Movable = created by an approved SureHub run, still at the
-    time it was created, and not yet started. A SureHub block the user moved by hand
-    is fixed: moving it was a decision, the plan must respect it."""
-    from app.modules.routines.models import RoutineRun
-
-    run_ids = {int(e["surehub_run"]) for e in events if str(e.get("surehub_run") or "").isdigit()}
-    created_at: dict[str, tuple[str, str]] = {}
-    if run_ids:
-        for run in session.exec(select(RoutineRun).where(RoutineRun.id.in_(run_ids))):
-            blocks = load_json(run.output).get("blocks", [])
-            for idx, event_id in (load_json(run.result).get("created") or {}).items():
-                if int(idx) < len(blocks):
-                    b = blocks[int(idx)]
-                    created_at[event_id] = (b["start"], b["end"])
-
+def split_events(events: list[dict], earliest: datetime,
+                 patterns: list[str]) -> tuple[list[dict], list[dict]]:
+    """(fixed, movable). Movable = plan block by the shared convention (title pattern),
+    not recurring, timed and not yet started — whoever created it (SureHub or chat)."""
     fixed, movable = [], []
     for ev in events:
-        untouched = created_at.get(ev["id"]) == (ev["start"], ev["end"])
-        future = not ev["all_day"] and datetime.fromisoformat(ev["start"]) >= earliest
-        (movable if untouched and future else fixed).append(ev)
+        ok = (not ev.get("recurring") and not ev["all_day"]
+              and datetime.fromisoformat(ev["start"]) >= earliest
+              and is_movable_title(ev["summary"], patterns))
+        (movable if ok else fixed).append(ev)
     return fixed, movable
 
 
 def _fmt_current(movable: list[dict]) -> str:
     if not movable:
         return ""
-    lines = [f"- {e['start'][:16]} → {e['end'][11:16]}: {e['summary']}" for e in movable]
+    lines = []
+    for e in movable:
+        desc = " — " + " ".join(e["description"].split())[:160] if e.get("description") else ""
+        lines.append(f"- {e['start'][:16]} → {e['end'][11:16]}: {e['summary']}{desc}")
     return CURRENT_PLAN.format(blocks="\n".join(lines))
 
 
 def build_prompt(start: date, end: date, label: str, inputs: list[tuple[str, str, str]],
                  events: list[dict], previous: dict | None = None,
                  correction: str | None = None, movable: list[dict] | None = None,
-                 earliest: datetime | None = None) -> str:
+                 earliest: datetime | None = None, conventions: str = DEFAULT_CONVENTIONS) -> str:
     themes = "\n".join(f"  - {k}: {v}" for k, v in THEMES.items())
     notes = "\n\n".join(f"### {lbl} ({rel})\n{content}" for lbl, rel, content in inputs) or "(sin notas)"
     whole_week = start.weekday() == 0 and (earliest is None or earliest.time() == datetime.min.time())
@@ -261,7 +327,8 @@ def build_prompt(start: date, end: date, label: str, inputs: list[tuple[str, str
           if earliest and earliest.time() != datetime.min.time() else "")
     prompt = PROMPT.format(span=span, start=start.isoformat(), end=end.isoformat(),
                            start_day=DAYS_ES_LONG[start.weekday()], end_day=DAYS_ES_LONG[end.weekday()],
-                           not_before=nb, themes=themes, events=_fmt_events(events),
+                           not_before=nb, themes=themes, conventions=conventions.strip(),
+                           events=_fmt_events(events),
                            current=_fmt_current(movable or []), inputs=notes)
     if previous is not None and correction:
         prev = {"summary": previous.get("summary", ""), "blocks": previous.get("blocks", [])}
@@ -322,7 +389,7 @@ def parse_proposal(text: str, start: date, end: date, events: list[dict],
             "start": s.isoformat(timespec="seconds"),
             "end": e.isoformat(timespec="seconds"),
             "theme": theme if theme in CALENDAR_COLORS else "default",
-            "notes": str(raw.get("notes") or "").strip()[:200],
+            "description": str(raw.get("description") or raw.get("notes") or "").strip()[:500],
         })
         busy.append((s, e))  # also prevents the model's own blocks from overlapping
     blocks.sort(key=lambda b: b["start"])
@@ -345,14 +412,16 @@ def run(session: Session, ctx: RunContext) -> Outcome:
 
     # Calendar is mandatory: planning blind would propose blocks over real events.
     events = calendar_api.list_events(start, end)
-    fixed, movable = split_events(session, events, earliest)
+    ensure_conventions(vault)
+    conventions, patterns = load_conventions(vault)
+    fixed, movable = split_events(events, earliest, patterns)
     inputs = read_inputs(vault)
     warnings = []
     if not revision_is_fresh(vault, start):
         warnings.append("No hay revisión semanal reciente: el plan no la tiene en cuenta.")
 
     prompt = build_prompt(start, end, label, inputs, fixed, previous, ctx.correction,
-                          movable=movable, earliest=earliest)
+                          movable=movable, earliest=earliest, conventions=conventions)
     result = run_engine(ctx.engine, prompt, system=SYSTEM, cwd=str(vault), function=KEY)
     proposal = parse_proposal(result.text, start, end, fixed, earliest)
     if not proposal["blocks"]:
@@ -363,7 +432,7 @@ def run(session: Session, ctx: RunContext) -> Outcome:
         "not_before": earliest.isoformat(timespec="minutes"),
         "events_considered": len(fixed), "inputs": [rel for _, rel, _ in inputs],
         "warnings": warnings, "correction": ctx.correction,
-        "replaces": [{k: ev.get(k) for k in ("id", "summary", "start", "end", "color_id")}
+        "replaces": [{k: ev.get(k) for k in ("id", "summary", "start", "end", "color_id", "description")}
                      for ev in movable],
         **proposal,
     }
@@ -423,7 +492,7 @@ def _blocks_markdown(blocks: list[dict]) -> list[str]:
         d = date.fromisoformat(day)
         lines.append(f"## {DAYS_ES_LONG[d.weekday()]} {d.day}")
         for b in day_blocks:
-            extra = f" — {b['notes']}" if b.get("notes") else ""
+            extra = f" — {' '.join(b['description'].split())}" if b.get("description") else ""
             lines.append(f"- {b['start'][11:16]}–{b['end'][11:16]} · {b['title']} `{b['theme']}`{extra}")
         lines.append("")
     return lines
@@ -506,6 +575,7 @@ def approve(session: Session, run: RoutineRun, vault: Path) -> dict:
             event_id, _ = calendar_api.create_event(
                 b["title"], b["start"], b["end"], False, b["theme"],
                 private={"surehub_run": run.id, "surehub_routine": KEY},
+                description=b.get("description", ""),
             )
             created[str(i)] = event_id
         _save_result(session, run, result)
@@ -551,7 +621,8 @@ def undo(session: Session, run: RoutineRun, vault: Path) -> int:
     while removed:
         ev = removed[0]
         calendar_api.create_event(ev["summary"], ev["start"], ev["end"], False,
-                                  _theme_for_color(ev.get("color_id")))
+                                  _theme_for_color(ev.get("color_id")),
+                                  description=ev.get("description") or "")
         removed.pop(0)
         _save_result(session, run, result)
 

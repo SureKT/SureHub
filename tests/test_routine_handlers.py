@@ -257,8 +257,9 @@ async def test_cmd_routines_lists_runs_and_run_button(world):
     await rh.cmd_routines(update, make_context())
     text = update.message.reply_text.call_args.args[0]
     kb = update.message.reply_text.call_args.kwargs["reply_markup"]
-    assert "Planificación semanal" in text and "pendiente" in text
-    assert kb.inline_keyboard[0][0].callback_data == "rt:run:weekly_plan"
+    assert "Planificación semanal" in text and "Revisión semanal" in text and "pendiente" in text
+    datas = [row[0].callback_data for row in kb.inline_keyboard]
+    assert set(datas) == {"rt:run:weekly_plan", "rt:run:weekly_review"}
 
 
 async def test_run_button_executes_routine(world):
@@ -276,9 +277,10 @@ def test_api_routines_and_runs(client, session):
                            output='{"week": "2026-W48"}', result='{"created": {"0": "e"}}'))
     session.commit()
 
-    routines = client.get("/api/routines").json()
-    assert routines[0]["key"] == "weekly_plan"
-    assert routines[0]["last_run"]["status"] == "approved"
+    routines = {r["key"]: r for r in client.get("/api/routines").json()}
+    assert routines["weekly_plan"]["last_run"]["status"] == "approved"
+    assert routines["weekly_plan"]["cron"] is None
+    assert routines["weekly_review"]["cron"] == "0 18 * * sun"
 
     runs = client.get("/api/routines/runs", params={"routine_key": "weekly_plan"}).json()
     assert len(runs) == 1
