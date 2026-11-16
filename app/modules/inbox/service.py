@@ -38,7 +38,7 @@ EVENT_PROMPT = (
     "- Sin ninguna hora -> all_day=true.\n"
     "- theme: una de [coach, formacion, social, gimnasio, padel]; si no encaja, 'default'.\n"
     "- padel / pádel → theme=padel, summary='Pádel'\n"
-    "- escalada → theme=gimnasio, summary='Escalada'\n"
+    "- escalada → theme=padel, summary='Escalada'\n"
     "- gym / gimnasio → theme=gimnasio, summary='Gimnasio'\n"
     "- cine / teatro / concierto / cena social / billar / bolera → theme=social\n"
     "{context}\n"

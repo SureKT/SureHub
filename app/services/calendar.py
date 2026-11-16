@@ -9,7 +9,7 @@ CALENDAR_COLORS = {
     "formacion": "4",   # Flamingo — clase IA / proyectos de trabajo
     "social":    "5",   # Banana   — ocio con amigos
     "gimnasio":  "9",   # Blueberry — entreno rutinario
-    "padel":     "10",  # Basil    — pádel / deporte de club
+    "padel":     "10",  # Basil    — pádel, escalada, deporte de club
     "salud":     "11",  # Tomato   — médico, vacunas
     "default":   "8",   # Graphite — sin categorizar
 }
