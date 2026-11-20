@@ -99,7 +99,7 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 - `/gastos` — últimos 10, o `/gastos mes` (sin id, lista limpia)
 - `/gastosid` — igual que `/gastos` pero con el id de cada gasto para `/borrar` (oculto del menú, solo en `/help`)
 - `/inbox` — escaneo + digest con botones; job diario a `INBOX_DIGEST_HOUR`
-- `/routines` — lista rutinas + últimos runs + botón ▶️ para lanzarlas. La revisión semanal llega sola el domingo 18:00
+- `/routines` — lista rutinas + últimos runs + botón ▶️ para lanzarlas. La revisión semanal ya no salta sola (la hace la tarea programada de Claude); se puede lanzar a mano
 - `/analisis` — Claude Sonnet sobre finanzas del mes; **confirmación obligatoria** (inline) antes de llamar a la API; fuera del menú por coste
 
 **Retirado del bot:** `/recuerda`, `/memoria`, `/olvidar`, `/generar`, `/stats`
@@ -124,14 +124,15 @@ scripts/         # seed inicial de categorías (los one-off ya ejecutados se bor
 ## Estado actual del módulo Rutinas
 
 - Módulo `app/modules/routines/` + `bot/routine_handlers.py`. Objetivo: rutinas que corren solas en el server (PC apagado) y llegan por Telegram
-- **Definiciones en código** (`registry.py`: `Routine` con cron, tz, `run`, `catch_up_hours`), **solo los runs en BD** (`routine_runs`: trigger, status, output/result JSON, error, coste; columnas `engine`/`parent_run_id` sin uso, se quedan porque existen en prod). Rutina nueva = módulo con `run(session, ctx) -> Outcome` + entrada en `ROUTINES`
+- **Definiciones en código** (`registry.py`: `Routine` con cron, tz, `run`, `catch_up_hours`, `scheduled`: `False` = sin cron ni catch-up, solo ▶️ manual), **solo los runs en BD** (`routine_runs`: trigger, status, output/result JSON, error, coste; columnas `engine`/`parent_run_id` sin uso, se quedan porque existen en prod). Rutina nueva = módulo con `run(session, ctx) -> Outcome` + entrada en `ROUTINES`
 - **Scheduler en el proceso bot** (JobQueue/APScheduler `CronTrigger`), no en FastAPI: el bot tiene Telegram y el vault; un único proceso → sin duplicados. **Catch-up** al arrancar: disparo perdido por deploy/reinicio dentro de `catch_up_hours` sin run desde entonces → se lanza a los 30 s
 - `execute()` nunca lanza: fallo → `status=failed` + aviso ⚠️ por Telegram
 - LLM vía `engines.run_litellm` (→ `llm.complete_routine` → `llm_router`, coste logueado). Sin API REST: el historial se ve con `/routines` en Telegram
-- **Reparto con el chat de Claude del móvil:** el chat planifica y mueve el calendario (conector de Calendar); el server solo aporta lo que el chat no puede: **arrancar solo** el domingo y guardar la revisión. Convención de eventos para el chat en `{vault}/_surehub/convenciones-calendario.md` (nota del usuario)
+- **Reparto con la tarea programada de Claude (claude.ai, "Planificación semanal de Gerard", domingos 17:40):** la tarea hace la revisión y planifica la semana (conector de Calendar + vault vía la app de escritorio del PC). SureHub no planifica ni hace la revisión por defecto. Convención de eventos en `{vault}/_surehub/convenciones-calendario.md` (nota del usuario)
+- **Decisión (2026-11-20):** `weekly_review` pasa a `scheduled=False`. Con las dos activas, el domingo se preguntaba dos veces y salían dos notas (`…md` y `…-2.md`); su única ventaja (escribir con el PC apagado) no le llegaba a la tarea, que solo ve el vault con el PC encendido. El módulo se queda (portfolio + ▶️ manual). Reactivar = `scheduled=True`, pero entonces quitar la revisión del prompt de la tarea
 - **Decisión (2026-11-16):** hubo un `weekly_plan` (propuesta de bloques → aprobar → Calendar, deshacer) y se eliminó: duplicaba al chat y era la parte cara y arriesgada. Recuperable en git (`2b7ccda`). No reintroducir planificación en el server sin hablarlo antes
 
-**`weekly_review`** (domingo 18:00, catch-up hasta lunes 9:00):
+**`weekly_review`** (solo manual; si se reactiva: domingo 18:00, catch-up hasta lunes 9:00):
 - Envía las preguntas leídas en vivo de `{vault}/Personal/Revisión semanal.md` (editable en Obsidian; fallback en código) con botones `🎤 Responder` / `⏭ Saltar`. Run en `awaiting_input` (persistido: sobrevive a reinicios)
 - Respuesta = siguiente texto/audio tras `Responder`, o **reply** al mensaje de preguntas (`message_id` guardado en `run.result`). Sin pulsar ni responder al mensaje, el texto sigue la captura normal
 - Sonnet ordena la respuesta por pregunta (estilo de la última revisión) → **nota nueva** `planificacion/revisiones/AAAA-MM-DD.md` (nunca sobrescribe: `-2`, `-3`…; escritura atómica `.syncthing.*.tmp` → `os.replace`). Fallo LLM → guarda la respuesta cruda igualmente

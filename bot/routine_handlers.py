@@ -104,7 +104,8 @@ async def routine_job(context: ContextTypes.DEFAULT_TYPE):
 
 
 def schedule_routines(app: Application) -> None:
-    for r in ROUTINES.values():
+    scheduled = [r for r in ROUTINES.values() if r.scheduled]
+    for r in scheduled:
         app.job_queue.run_custom(
             routine_job,
             job_kwargs={"trigger": r.trigger(), "misfire_grace_time": 3600, "coalesce": True},
@@ -114,7 +115,7 @@ def schedule_routines(app: Application) -> None:
     # JobQueue is in-memory: a deploy/restart at fire time would silently skip the
     # run. RoutineRun is the source of truth to detect and recover it.
     with Session(engine) as session:
-        for r in ROUTINES.values():
+        for r in scheduled:
             if needs_catch_up(session, r, datetime.now(ZoneInfo(r.timezone))):
                 logger.info("Routine %s missed its last fire → catch-up", r.key)
                 app.job_queue.run_once(routine_job, when=CATCH_UP_DELAY_S,
@@ -131,7 +132,8 @@ async def cmd_routines(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines = ["<b>Rutinas</b>"]
         buttons = []
         for r in ROUTINES.values():
-            lines.append(f"• <b>{html.escape(r.name)}</b> — <code>{r.cron}</code>")
+            when = f"<code>{r.cron}</code>" if r.scheduled else "solo manual"
+            lines.append(f"• <b>{html.escape(r.name)}</b> — {when}")
             buttons.append([InlineKeyboardButton(f"▶️ {r.name}", callback_data=f"rt:run:{r.key}")])
         runs = list_runs(session, limit=5)
         if runs:

@@ -13,6 +13,9 @@ ROUTINES: dict[str, Routine] = {
         timezone=settings.TIMEZONE,
         run=weekly_review.run,
         catch_up_hours=15,  # Sunday 18:00 missed → still asks until Monday 09:00
+        # 2026-11-20: the review moved to the Claude scheduled task that plans the week
+        # (it reads the vault through the PC). Two reviews = asking twice and two notes.
+        scheduled=False,
     ),
 }
 

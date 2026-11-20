@@ -37,6 +37,8 @@ class Routine:
     # If the bot was down at fire time (deploy, restart), run on startup as long
     # as we're within this many hours of the missed fire. 0 = no catch-up.
     catch_up_hours: int = 0
+    # False = no cron or catch-up; still runnable by hand from /routines.
+    scheduled: bool = True
 
     def trigger(self) -> CronTrigger:
         return CronTrigger.from_crontab(self.cron, timezone=ZoneInfo(self.timezone))

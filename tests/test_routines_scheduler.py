@@ -19,10 +19,11 @@ def _routine(run=None, cron="0 19 * * sun", catch_up_hours=14):
                    catch_up_hours=catch_up_hours)
 
 
-def test_weekly_review_registered_sunday_18_madrid():
+def test_weekly_review_not_scheduled():
+    # the Claude scheduled task does the review now; SureHub's is manual only
     r = ROUTINES["weekly_review"]
-    fire = r.trigger().get_next_fire_time(None, datetime(2026, 11, 16, 10, tzinfo=TZ))
-    assert fire == datetime(2026, 11, 22, 18, tzinfo=TZ)
+    assert r.scheduled is False
+    assert r.cron == "0 18 * * sun"  # kept so re-enabling is a one-line change
 
 
 def test_trigger_respects_dst():
@@ -89,16 +90,20 @@ def test_needs_catch_up_only_without_run_since_fire(session):
 def test_schedule_routines_registers_cron_and_catch_up(monkeypatch, engine):
     import bot.routine_handlers as rh
 
+    manual = Routine(key="manual", name="M", description="", cron="0 9 * * *",
+                     timezone="Europe/Madrid", run=lambda s, ctx: Outcome(), scheduled=False)
+    monkeypatch.setattr(rh, "ROUTINES", {"test": _routine(), "manual": manual})
     monkeypatch.setattr(rh, "engine", engine)
     monkeypatch.setattr(rh, "needs_catch_up", lambda s, r, now: True)
     app = MagicMock()
 
     rh.schedule_routines(app)
 
+    # scheduled=False routines get neither a cron job nor a catch-up
     scheduled = [c.kwargs["data"] for c in app.job_queue.run_custom.call_args_list]
-    assert scheduled == [{"key": "weekly_review", "trigger": "scheduled"}]
+    assert scheduled == [{"key": "test", "trigger": "scheduled"}]
     caught = [c.kwargs["data"]["key"] for c in app.job_queue.run_once.call_args_list]
-    assert "weekly_review" in caught
+    assert caught == ["test"]
 
 
 def test_schedule_routines_no_catch_up_when_not_needed(monkeypatch, engine):

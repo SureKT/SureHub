@@ -33,6 +33,8 @@ aquí solo hitos si hace falta contexto.
   vault, respuesta por voz/texto → nota nueva + resumen para el chat de Claude del móvil).
   Se construyó y luego se quitó un planificador `weekly_plan` (→ Calendar con aprobación): duplicaba al
   chat del móvil, que es quien planifica. En git `2b7ccda` por si acaso.
+  2026-11-20: `weekly_review` pasa a solo manual (`scheduled=False`); la revisión y la planificación
+  las hace la tarea programada de Claude de los domingos.
 
 - [x] **LLM Routing — Fase 2 (Ollama local)** (2026-08-25) — container `ollama` en el server
   (CPU, red `ollama-net`) + `qwen2.5:3b`. `TIERS["local_ok"]` = local → fallback Haiku, con
